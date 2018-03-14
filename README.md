@@ -1,2 +1,2 @@
 # kaggle
-Cong's code for kaggle competition
+Cong's code for kaggle
