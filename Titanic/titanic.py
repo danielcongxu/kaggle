@@ -1,6 +1,9 @@
 import warnings
 import pandas as pd
 import numpy as np
+from sklearn.metrics import confusion_matrix
+from misc import show_confusion_matrix
+from misc import SKlearnHelper
 from scipy import stats
 import sklearn as sk
 import itertools
@@ -161,3 +164,232 @@ sns.factorplot(x="Large_Family", y="Survived", data=train_set, kind="bar", color
 tab_shared_ticket = pd.crosstab(train_set['Shared_ticket'], train_set['Survived'])
 print(tab_shared_ticket)
 sns.factorplot(x="Shared_ticket", y="Survived", data=train_set, kind="bar", color="blue")
+
+# Process Title
+# Conclusion:
+print(combine_set['Age'].groupby(combine_set['Title']).count())
+print(combine_set['Age'].groupby(combine_set['Title']).mean())
+dummy = combine_set[combine_set['Title'].isin(['Mr','Miss','Mrs','Master'])]
+dummy['Age'].hist(by=dummy['Title'], bins=np.arange(0, 81, 1))
+
+plt.figure(figsize=(6, 6))
+tab_young = pd.crosstab(train_set['Young'], train_set['Survived'])
+print(tab_young)
+sns.barplot(x="Young", y="Survived", data=train_set)
+
+# Process Fare_cat (Fare_category)
+tab_fare_cat = pd.crosstab(train_set['Fare_cat'], train_set['Survived'])
+print(tab_fare_cat)
+plt.figure(figsize=(6, 6))
+sns.barplot(x="Fare_cat", y="Survived", data=train_set)
+
+# Preparation for modeling
+combine_set = pd.concat([train_set.drop("Survived", axis=1), test_set])
+survived = train_set['Survived']
+combine_set['Sex'] = combine_set['Sex'].astype("category")
+combine_set['Sex'].cat.categories = [0, 1]
+combine_set['Sex'] = combine_set['Sex'].astype("int")
+combine_set['Embarked'] = combine_set['Embarked'].astype("category")
+combine_set['Embarked'].cat.categories = [0, 1, 2]
+combine_set['Embarked'] = combine_set['Embarked'].astype("int")
+combine_set['Deck'] = combine_set['Deck'].astype("category")
+combine_set['Deck'].cat.categories = [0, 1, 2, 3, 4, 5, 6, 7, 8]
+combine_set['Deck'] = combine_set['Deck'].astype("int")
+train_set = combine_set.iloc[:len(train_set)]
+test_set = combine_set.iloc[len(train_set):]
+train_set['Survived'] = survived
+
+plt.subplots( figsize=( 12 , 10 ) )
+sns.heatmap(train_set.drop('PassengerId', axis=1).corr(), vmax=1.0, square=True, annot=True)
+
+######################################################################
+# Modeling
+train_set, val_set = train_test_split(train_set, test_size=0.2, random_state=0)
+cols = ['Sex', 'Pclass', 'Cabin_known', 'Large_Family', 'Shared_ticket', 'Young', 'Alone', 'Child']
+tcols = np.append(['Survived'], cols)
+df = train_set.loc[:, tcols].dropna()
+X = df.loc[:, cols]
+y = np.ravel(df.loc[:,['Survived']]) # ravel is equal to flatten
+df_test = val_set.loc[:, tcols].dropna()
+X_test = df_test.loc[:, cols]
+y_test = np.ravel(df_test.loc[:, ['Survived']])
+
+# Logistic Regression
+classifier_lgr = LogisticRegression()
+classifier_lgr.fit(X, y)
+score_lgr = cross_val_score(classifier_lgr, X, y, cv=5).mean()
+print("The mean evaluation accuracy of logistic regression is %s" % score_lgr)
+
+# Perceptron
+classifier_pctr = Perceptron(class_weight="balanced")
+classifier_pctr.fit(X, y)
+score_pctr = cross_val_score(classifier_pctr, X, y, cv=5).mean()
+print("The mean evaluation accuracy of perceptron is %s" % score_pctr)
+
+# KNN
+classifier_knn = KNeighborsClassifier(n_neighbors=len(X.columns), weights='distance')
+classifier_knn.fit(X, y)
+score_knn = cross_val_score(classifier_knn, X, y, cv=5).mean()
+print("The mean evaluation accuracy of KNN is %s" % score_knn)
+
+# SVM
+classifier_svm = svm.SVC(class_weight="balanced")
+classifier_svm.fit(X, y)
+score_svm = cross_val_score(classifier_svm, X, y, cv=5).mean()
+print("The mean evaluation accuracy of SVM is %s" % score_svm)
+
+# Decision Tree
+# http://blog.csdn.net/li980828298/article/details/51172744
+classifier_dtree = tree.DecisionTreeClassifier(class_weight="balanced", min_weight_fraction_leaf=0.01)
+classifier_dtree.fit(X, y)
+score_dtree = cross_val_score(classifier_dtree, X, y, cv=5).mean()
+print("The mean evaluation accuracy of SVM is %s" % score_dtree)
+
+# Tuning parameters, illustrated with SVM
+# Grid search
+clf_svm = svm.SVC(class_weight="balanced")
+param_grid = {"C": [0.1, 0.3, 1.0, 3.0, 10.0],
+              "kernel": ["linear", "rbf", "poly", "sigmoid"]}
+gs = GridSearchCV(estimator=clf_svm, param_grid=param_grid, scoring="accuracy", cv=3)
+gs.fit(X, y)
+print("best score: %f" % gs.best_score_)
+print(gs.best_params_)
+
+class_names = ["Dead", "Alive"]
+cnf_mat = confusion_matrix(y_pred=classifier_svm.predict(X_test), y_true=y_test)
+show_confusion_matrix(cnf_mat, class_names)
+
+# Model evaluation
+# cross validation - cross_val_score on training set
+
+# Ranking models
+models = pd.DataFrame({'Model': ["Support Vector Machine", "KNN", "Logistic Regression",
+                                 "Decision Tree", "Perceptron"],
+                       'Score': [score_svm, score_knn, score_lgr, score_dtree, score_pctr]})
+models.sort_values(by='Score', axis=0, ascending=False)
+
+# Ensemble methods
+classifier_vote = VotingClassifier(estimators=[
+    ('knn', classifier_knn),
+    ('svm', classifier_svm),
+    ("logistic", classifier_lgr),
+    ("decisiontree", classifier_dtree),
+    ("perceptron", classifier_pctr)],
+    weights=[2, 3, 2, 3, 1],
+    voting='hard'
+)
+classifier_vote.fit(X, y)
+score_votes = cross_val_score(classifier_vote, X, y, cv=5, scoring='accuracy')
+print("Voting: Accuracy: %0.2f (+/- %0.2f)" % (score_votes.mean(), score_votes.std()))
+
+train = X
+test = test_set
+n_train = train.shape[0]
+n_test = test.shape[0]
+SEED = 0
+NFOLDS = 5
+kf = KFold(n_splits=NFOLDS, random_state=SEED)
+
+
+def get_oof(clf, x_train, y_train, x_test):
+    oof_train = np.zeros((n_train,))
+    oof_test = np.zeros((n_test,))
+    oof_test_skf = np.empty((NFOLDS, n_test))
+
+    for i, (train_index, test_index) in enumerate(kf.split(x_train)):
+        x_tr = x_train[train_index]
+        y_tr = y_train[train_index]
+        x_te = x_train[test_index]
+
+        clf.train(x_tr, y_tr)
+        oof_train[test_index] = clf.predict(x_te)
+        oof_test_skf[i, :] = clf.predict(x_test)
+
+    oof_test[:] = np.median(oof_test_skf, axis=0)
+    return oof_train.reshape(-1, 1), oof_test.reshape(-1, 1)
+
+
+lgr_params = {
+    'tol': 1e-4,
+    "C": 1.0}
+
+pctr_params = {
+    'alpha': 1e-4,}
+
+knn_params = {
+    'n_neighbors': 10,
+    'weights':  'distance'}
+
+svm_params = {
+    "C": 1.0,
+    "kernel": "rbf"}
+
+dtree_params = {
+    "min_weight_fraction_leaf": 0.01,
+    "criterion": "gini"}
+
+lgr = SKlearnHelper(clf=LogisticRegression, seed=SEED, params=lgr_params)
+pctr = SKlearnHelper(clf=Perceptron, seed=SEED, params=pctr_params)
+knn = SKlearnHelper(clf=KNeighborsClassifier, seed=SEED, params=knn_params)
+svm = SKlearnHelper(clf=svm.SVC, seed=SEED, params=svm_params)
+dtree = SKlearnHelper(clf=tree.DecisionTreeClassifier, seed=SEED, params=dtree_params)
+
+y_train = y
+train = X
+foo = test.loc[:, cols]
+x_train = train.values
+x_test = foo.values
+
+lgr_oof_train, lgr_oof_test = get_oof(lgr, x_train, y_train, x_test)
+pctr_oof_train, pctr_oof_test = get_oof(pctr, x_train, y_train, x_test)
+knn_oof_train, knn_oof_test = get_oof(knn, x_train, y_train, x_test)
+svm_oof_train, svm_oof_test = get_oof(svm, x_train, y_train, x_test)
+dtree_oof_train, dtree_oof_test = get_oof(dtree, x_train, y_train, x_test)
+
+print("Training is complete")
+
+base_predictions_train = pd.DataFrame(
+    {"LogisticRegression": lgr_oof_train.ravel(),
+     "Perceptron": pctr_oof_train.ravel(),
+     "KNN": knn_oof_train.ravel(),
+     "SVM": svm_oof_train.ravel(),
+     "DecisionTree": dtree_oof_train.ravel()})
+
+print(base_predictions_train.head())
+
+# Stacking of classifiers that have less correlation gives better results.
+# Observe based on heatmap (covariance matrix)
+plt.figure(figsize=(12, 10))
+sns.heatmap(base_predictions_train.corr(), vmax=1.0, square=True, annot=True)
+plt.show()
+
+x_train = np.concatenate((lgr_oof_train, pctr_oof_train, knn_oof_train, svm_oof_train, dtree_oof_train), axis=1)
+x_test = np.concatenate((lgr_oof_test, pctr_oof_test, knn_oof_test, svm_oof_test, dtree_oof_test), axis=1)
+
+clf_stack = xgb.XGBClassifier(
+    #learning_rate = 0.02,
+    n_estimators= 2000,
+    max_depth= 4,
+    min_child_weight= 2,
+    #gamma=1,
+    gamma=0.9,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    objective= 'binary:logistic',
+    scale_pos_weight=1)
+clf_stack = clf_stack.fit(x_train, y_train)
+stack_pred = clf_stack.predict(x_test)
+
+scores = cross_val_score(clf_stack, x_train, y_train, cv=5)
+print("Mean score = %.3f, Std deviation = %.3f" % (np.mean(scores), np.std(scores)))
+
+df2 = test.loc[:, cols].fillna(method='pad')
+surv_pred = classifier_vote.predict(df2)
+
+submit = np.c_[test.loc[:, "PassengerId"], surv_pred]
+np.savetxt("titanic.csv",
+           submit,
+           delimiter=',',
+           header='PassengerId,Survived',
+           comments='',
+           fmt="%d")
