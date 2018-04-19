@@ -8,6 +8,7 @@ from collections import defaultdict
 from collections import Counter
 from nltk.stem.porter import PorterStemmer
 from sklearn import metrics
+import xgboost as xgb
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.utils.class_weight import compute_sample_weight
@@ -198,6 +199,27 @@ def modelfit(estimator, train_set, target_set, performCV=True, cv_folds=5):
     if performCV:
         print("CV Score : Mean - %.7g | Std - %.7g | Min - %.7g | Max - %.7g" %
               (np.mean(cv_score), np.std(cv_score), np.min(cv_score), np.max(cv_score)))
+
+
+def modelfit_xgboost(estimator, train_set, target_set, performCV=True, cv_folds=5, early_stopping_rounds=50):
+    if performCV is True:
+        xgb_param = estimator.get_xgb_params()
+        xgtrain = xgb.DMatrix(train_set, label=target_set)
+        cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=estimator.get_params()['n_estimators'], nfold=cv_folds,
+                          metrics='auc', early_stopping_rounds=early_stopping_rounds)
+        estimator.set_params(n_estimators=cvresult.shape[0])
+
+    # Fit the algorithm on the data
+    estimator.fit(train_set, target_set, eval_metric='auc')
+
+    # Predict training set:
+    train_predictions = estimator.predict(train_set)
+    train_predprob = estimator.predict_proba(train_set)[:, 1]
+
+    # Print model report:
+    print("\nModel Report pf XGBoost")
+    print("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
+    print("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
 
 
 def run_gridsearch(X, y, estimator, param_grid, **params):

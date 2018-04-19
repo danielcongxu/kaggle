@@ -227,12 +227,12 @@ clf_xgb = xgb.XGBClassifier(
     max_depth=35,
     min_child_weight=1,
     gamma=0.1,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    nthread=8,
+    subsample=0.6,
+    colsample_bytree=0.65,
+    nthread=4,
     scale_pos_weight=1)
 
-# misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
 # base line model
 # Accuracy : 0.9444
 # AUC Score (Train): 0.877955
@@ -264,23 +264,40 @@ clf_xgb = xgb.XGBClassifier(
 #                     scoring='roc_auc', n_jobs=8, method='XGBoost')
 
 # fine tune subsample and colsample_bytree
+# optimal: subsample: 0.6 colsaumple_bytree: 0.65
+# param_grid = {"subsample": np.arange(0.6, 1, 0.1),
+#                 "colsample_bytree": np.arange(0.6, 1, 0.1)}
+# ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
+#                             scoring='roc_auc', n_jobs=4, method='XGBoost')
+# opt_subsample = ret['subsample']
+# opt_colsubmple = ret['colsample_bytree']
+# clf_xgb.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
+#
+# param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
+#                 "colsample_bytree": [opt_colsubmple - 0.05, opt_colsubmple, opt_colsubmple+ 0.05]}
+# ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
+#                     scoring='roc_auc', n_jobs=4, method='XGBoost')
+# opt_subsample = ret['subsample']
+# opt_colsubmple = ret['colsample_bytree']
+# clf_xgb.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
+
 if __name__ == "__main__":
-    param_grid = {"subsample": np.arange(0.6, 1, 0.1),
-                  "colsample_bytree": np.arange(0.6, 1, 0.1)}
+    # param_grid = {"reg_lambda": [1e-2, 0.1, 1, 10, 100]}
+    # misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
+    #                     scoring='roc_auc', n_jobs=8, method='XGBoost')
+    param_grid = {"reg_lambda": [0, 0.1, 0.5, 1, 5]}
     ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-                              scoring='roc_auc', n_jobs=4, method='XGBoost')
-    opt_subsample = ret['subsample']
-    opt_colsubmple = ret['colsample_bytree']
-    clf_xgb.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
-
-    param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
-                  "colsample_bytree": [opt_colsubmple - 0.05, opt_colsubmple, opt_colsubmple+ 0.05]}
-    ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-                        scoring='roc_auc', n_jobs=4, method='XGBoost')
-
-    opt_subsample = ret['subsample']
-    opt_colsubmple = ret['colsample_bytree']
-    clf_xgb.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
-    param_grid = {"reg_lambda": [1e-2, 0.1, 1, 10, 100]}
-    misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
                         scoring='roc_auc', n_jobs=8, method='XGBoost')
+    clf_xgb.set_params(reg_lambda=ret['reg_lambda'])
+
+    clf_xgb.set_params(learning_rate=0.01, n_estimators=5000)
+    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+
+    clf_xgb.set_params(learning_rate=0.025, n_estimators=5000)
+    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+
+    clf_xgb.set_params(learning_rate=0.05, n_estimators=5000)
+    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+
+    clf_xgb.set_params(learning_rate=0.075, n_estimators=5000)
+    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
