@@ -100,8 +100,9 @@ xgb_stack = xgb.XGBClassifier(
 
 
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
+    # SVM
+    logger = misc.init_logger(method)
     if not skip:
-        # SVM
         # scale data for speeding up
         scaling = MinMaxScaler(feature_range=(-1, 1)).fit(trainX)
         transformed_trainX = scaling.transform(trainX)
@@ -110,13 +111,14 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                                                       sample_weight=False,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(C=best_params['C'], gamma=best_params['gamma'])
+    logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
 
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
+    # RandomForest
+    logger = misc.init_logger(method)
     if not skip:
-        # RandomForest
-        logger = misc.init_logger(method)
         # base line model
         # Accuracy : 0.9395
         # AUC Score (Train): 0.869138
@@ -161,13 +163,14 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
         logger.info(
             "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+    logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
 
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
+    # GBDT
+    logger = misc.init_logger(method)
     if not skip:
-        # GBDT
-        logger = misc.init_logger(method)
         # base line model
         # Accuracy : 0.9409
         # AUC Score (Train): 0.866622
@@ -234,13 +237,14 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
         logger.info(
             "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+    logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
 
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
+    # Xgboost
+    logger = misc.init_logger(method)
     if not skip:
-        # Xgboost
-        logger = misc.init_logger(method)
         # base line model
         # Accuracy : 0.9444
         # AUC Score (Train): 0.877955
@@ -313,13 +317,14 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                     "Best learning_rate is %s, best n_estimators is %s. The corresponding cv_score is %s" % (
                         opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
+    logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
 
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
+    # Extremely Randomized Trees
+    logger = misc.init_logger(method)
     if not skip:
-        # Extremely Randomized Trees
-        logger = misc.init_logger(method)
         # base line model
         # Accuracy : 0.9395
         # AUC Score (Train): 0.869138
@@ -364,14 +369,14 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
         logger.info(
             "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+    logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
 
 def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip=False):
+    # Ensemble
+    logger = misc.init_logger(method)
     if not skip:
-        # Ensemble
-        logger = misc.init_logger(method)
-
         clf_vote_soft = VotingClassifier(
             estimators=[
                 ('svm', clf_svm),
