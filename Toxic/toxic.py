@@ -99,7 +99,7 @@ xgb_stack = xgb.XGBClassifier(
 )
 
 
-def train_SVM(estimator, trainX, trainY, method, skip=False):
+def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     if not skip:
         # SVM
         # scale data for speeding up
@@ -108,12 +108,12 @@ def train_SVM(estimator, trainX, trainY, method, skip=False):
         param_grid = {'C': [1, 10, 100]}
         best_params, best_score = misc.run_gridsearch(transformed_trainX, trainY, estimator, param_grid, cv=3,
                                                       sample_weight=False,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(C=best_params['C'], gamma=best_params['gamma'])
     return estimator
 
 
-def train_RF(estimator, trainX, trainY, method, skip=False):
+def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     if not skip:
         # RandomForest
         logger = misc.init_logger(method)
@@ -126,45 +126,45 @@ def train_RF(estimator, trainX, trainY, method, skip=False):
         # fine tune n_estimators
         param_grid = {"n_estimators": np.arange(50, 601, 50)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # fine tune max_depth and min_samples_split
         param_grid = {"max_depth": np.arange(5, 36, 2),
                       "min_samples_split": np.arange(0.005, 0.031, 0.005)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
 
         # fine tune min_samples_split and min_samples_leaf
         param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
 
         # fine tune max_features
         feat_num = len(list(trainX.columns))
         param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_features=best_params['max_features'])
 
         # refine-tune n_estimators
         param_grid = {"n_estimators": np.arange(40, 801, 40)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
         estimator.fit(trainX, trainY)
-        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=4).mean()
-        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=4).mean()
+        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=n_jobs).mean()
+        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
         logger.info(
             "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
     return estimator
 
 
-def train_GBDT(estimator, trainX, trainY, method, skip=False):
+def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     if not skip:
         # GBDT
         logger = misc.init_logger(method)
@@ -177,7 +177,7 @@ def train_GBDT(estimator, trainX, trainY, method, skip=False):
         # fine tune n_estimators
         param_grid = {"n_estimators": np.arange(50, 601, 50)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         best_n_estimators = best_params['n_estimators']
         estimator.set_params(n_estimators=best_n_estimators)
 
@@ -185,26 +185,26 @@ def train_GBDT(estimator, trainX, trainY, method, skip=False):
         param_grid = {"max_depth": np.arange(5, 36, 2),
                       "min_samples_split": np.arange(0.005, 0.031, 0.005)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
 
         # fine tune min_samples_split and min_samples_leaf
         param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
 
         # fine tune max_features
         feat_num = len(list(trainX.columns))
         param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_features=best_params['max_features'])
 
         # fine tune subsample
         param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(subsample=best_params['subsample'])
 
         # refine-tune n_estimatosr
@@ -230,14 +230,14 @@ def train_GBDT(estimator, trainX, trainY, method, skip=False):
 
         # With optimization, the optimal auc is 0.8751157067, the optimal accuracy is 0.945090275
         estimator.fit(trainX, trainY)
-        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc').mean()
-        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy').mean()
+        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=n_jobs).mean()
+        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
         logger.info(
             "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
     return estimator
 
 
-def train_XGB(estimator, trainX, trainY, method, skip=False):
+def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     if not skip:
         # Xgboost
         logger = misc.init_logger(method)
@@ -251,7 +251,7 @@ def train_XGB(estimator, trainX, trainY, method, skip=False):
         param_grid = {"max_depth": np.arange(5, 40, 2),
                       "min_child_weight": np.arange(1, 8, 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_depth=best_params['max_depth'], min_child_weight=best_params['min_child_weight'])
 
         # refine-tune max_depth and min_child_weight
@@ -263,20 +263,20 @@ def train_XGB(estimator, trainX, trainY, method, skip=False):
                                                                                     opt_min_child_weight + 1]}
 
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_depth=best_params['max_depth'], min_child_weight=best_params['min_child_weight'])
 
         # fine tune gamma
         param_grid = {"gamma": np.arange(0, 0.5, 0.1)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(gamma=best_params['gamma'])
 
         # fine tune subsample and colsample_bytree
         param_grid = {"subsample": np.arange(0.6, 1, 0.1),
                       "colsample_bytree": np.arange(0.6, 1, 0.1)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         opt_subsample = best_params['subsample']
         opt_colsubmple = best_params['colsample_bytree']
         estimator.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
@@ -284,17 +284,17 @@ def train_XGB(estimator, trainX, trainY, method, skip=False):
         param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
                       "colsample_bytree": [opt_colsubmple - 0.05, opt_colsubmple, opt_colsubmple + 0.05]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(subsample=best_params['subsample'], colsample_bytree=best_params['colsample_bytree'])
 
         param_grid = {"reg_lambda": [1e-2, 0.1, 1, 10, 100]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         opt_lambda = best_params['reg_lambda']
         param_grid = {
             "reg_lambda": [0, opt_lambda / 5.0, opt_lambda / 2.0, opt_lambda, opt_lambda * 2.0, opt_lambda * 5.0]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(reg_lambda=best_params['reg_lambda'])
 
         # refine tune learning_rate and n_estimators
@@ -316,7 +316,7 @@ def train_XGB(estimator, trainX, trainY, method, skip=False):
     return estimator
 
 
-def train_EXT(estimator, trainX, trainY, method, skip=False):
+def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     if not skip:
         # Extremely Randomized Trees
         logger = misc.init_logger(method)
@@ -329,45 +329,45 @@ def train_EXT(estimator, trainX, trainY, method, skip=False):
         # fine tune n_estimators
         param_grid = {"n_estimators": np.arange(50, 601, 50)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # fine tune max_depth and min_samples_split
         param_grid = {"max_depth": np.arange(5, 36, 2),
                       "min_samples_split": np.arange(0.005, 0.031, 0.005)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
 
         # fine tune min_samples_split and min_samples_leaf
         param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
 
         # fine tune max_features
         feat_num = len(list(trainX.columns))
         param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(max_features=best_params['max_features'])
 
         # refine-tune n_estimators
         param_grid = {"n_estimators": np.arange(40, 801, 40)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
-                                                      scoring='roc_auc', n_jobs=4, method=method)
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
         estimator.fit(trainX, trainY)
-        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=4).mean()
-        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=4).mean()
+        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=n_jobs).mean()
+        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
         logger.info(
             "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
     return estimator
 
 
-def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, skip=False):
+def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip=False):
     if not skip:
         # Ensemble
         logger = misc.init_logger(method)
@@ -409,8 +409,8 @@ def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, meth
                                'StackingClassifierWithProb',
                                'StackingClassifierWithXGB']):
             clf.fit(trainX, trainY)
-            score_auc = cross_val_score(clf, trainX, trainY, cv=5, scoring='roc_auc', verbose=1).mean()
-            score_acc = cross_val_score(clf, trainX, trainY, cv=5, scoring='accuracy', verbose=1).mean()
+            score_auc = cross_val_score(clf, trainX, trainY, cv=5, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
+            score_acc = cross_val_score(clf, trainX, trainY, cv=5, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
             logger.info(
                 'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
                     label, score_auc, score_acc))
