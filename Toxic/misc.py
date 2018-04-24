@@ -51,14 +51,19 @@ def calc_vocab_frequency(content, vocab):
         else:
             content = content[sep.span()[1]:]
 
-        if len(str) < 1 or str in exclude_list:
+        # remove duplicated substrings
+        regx = re.match(r'\b(\w+)\1+\b', str, re.IGNORECASE)
+        if regx:
+            str = regx.group(1)
+        if len(str) <= 2 or str in exclude_list:
             continue
+
         for dict in vocab.values():
             dict[str] += 1
     return vocab
 
 
-def sumForToxicType(df, remove_N_general=1000, min_toxic_fraction=0.01, regen=False):
+def sumForToxicType(df, remove_N_general=1000, min_toxic_fraction=0.02, regen=False):
     toxic_vocab = defaultdict(lambda: defaultdict(int))
     if not regen:
         dir_name = os.path.join(os.path.dirname(__file__), 'dict', str(remove_N_general))
@@ -179,7 +184,8 @@ def feature_engineering(original_data, vocab, type, is_test=False, csv=None):
     return modified_data
 
 
-def modelfit(estimator, train_set, target_set, performCV=True, cv_folds=5):
+def modelfit(estimator, train_set, target_set, method, performCV=True, cv_folds=5):
+    logger = init_logger(method)
     # Fit the estimatororithm on the data
     estimator.fit(train_set, target_set)
 
@@ -187,27 +193,22 @@ def modelfit(estimator, train_set, target_set, performCV=True, cv_folds=5):
     train_predictions = estimator.predict(train_set)
     train_predprob = estimator.predict_proba(train_set)[:, 1]
 
-    # Perform cross-validation:
+    # Print model report:
+    logger.info("\nModel Report")
+    logger.info("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
+    logger.info("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
+
+    # Perform cross-validation
+    cv_score = 0
     if performCV:
         cv_score = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc')
-
-    # Print model report:
-    print("\nModel Report")
-    print("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
-    print("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
-
-    if performCV:
-        print("CV Score : Mean - %.7g | Std - %.7g | Min - %.7g | Max - %.7g" %
+        logger.info("CV Score : Mean - %.7g | Std - %.7g | Min - %.7g | Max - %.7g" %
               (np.mean(cv_score), np.std(cv_score), np.min(cv_score), np.max(cv_score)))
+    return cv_score
 
 
-def modelfit_xgboost(estimator, train_set, target_set, performCV=True, cv_folds=5, early_stopping_rounds=50):
-    if performCV is True:
-        xgb_param = estimator.get_xgb_params()
-        xgtrain = xgb.DMatrix(train_set, label=target_set)
-        cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=estimator.get_params()['n_estimators'], nfold=cv_folds,
-                          metrics='auc', early_stopping_rounds=early_stopping_rounds)
-        estimator.set_params(n_estimators=cvresult.shape[0])
+def modelfit_xgboost(estimator, train_set, target_set, method, performCV=True, cv_folds=5, early_stopping_rounds=50):
+    logger = init_logger(method)
 
     # Fit the algorithm on the data
     estimator.fit(train_set, target_set, eval_metric='auc')
@@ -217,9 +218,24 @@ def modelfit_xgboost(estimator, train_set, target_set, performCV=True, cv_folds=
     train_predprob = estimator.predict_proba(train_set)[:, 1]
 
     # Print model report:
-    print("\nModel Report pf XGBoost")
-    print("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
-    print("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
+    logger.info("\nModel Report pf XGBoost")
+    logger.info("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
+    logger.info("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
+
+    best_iter = 100
+    cv_score = 0
+    if performCV is True:
+        xgb_param = estimator.get_xgb_params()
+        xgtrain = xgb.DMatrix(train_set, label=target_set)
+        cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=estimator.get_params()['n_estimators'], nfold=cv_folds,
+                          metrics='auc', early_stopping_rounds=early_stopping_rounds, verbose_eval=True)
+        best_iter = cvresult.shape[0]
+        logger.info("Best iteration: %s" % str(best_iter))
+        estimator.set_params(n_estimators=best_iter)
+        cv_score = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc')
+        logger.info("CV Score : Mean - %.7g | Std - %.7g | Min - %.7g | Max - %.7g" %
+              (np.mean(cv_score), np.std(cv_score), np.min(cv_score), np.max(cv_score)))
+    return cv_score, best_iter
 
 
 def run_gridsearch(X, y, estimator, param_grid, **params):
@@ -233,6 +249,7 @@ def run_gridsearch(X, y, estimator, param_grid, **params):
         logger.info("best params are %s" % gs.best_params_)
         for item in gs.grid_scores_:
             logger.info("mean: %s, %s\n" % (item[1], str(item[0])))
+        return gs.best_params_, gs.best_score_
     except Exception:
         logger.error("Error found! Break down...\n")
 

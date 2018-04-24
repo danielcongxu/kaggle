@@ -1,11 +1,17 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import misc
+from sklearn.externals import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import ExtraTreesClassifier
+from mlxtend.classifier import StackingClassifier
+from sklearn.ensemble import VotingClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import cross_val_score
 from sklearn import svm
@@ -22,282 +28,419 @@ test_set = pd.read_csv("dataset/test.csv")
 # print(test_set.head())
 # print(train_set['toxic'].value_counts())
 
-# Generate vocabulary
-toxic_vocab = misc.sumForToxicType(train_set)
-
-# Feature engineering
-toxic_train_set = misc.feature_engineering(train_set, toxic_vocab, 'toxic', csv='dataset/toxic_train.csv')
-
-# Modeling
-# toxic_train_set, toxic_val_set = train_test_split(toxic_train_set, test_size=0.2, random_state=0)
-toxic_train_X = toxic_train_set.drop(['score', 'id', 'comment_text'], axis=1).loc[:]
-toxic_train_y = np.ravel(toxic_train_set.loc[:, ['score']])
-# toxic_test_X = toxic_val_set.drop(['score', 'id', 'comment_text'], axis=1).loc[:]
-# toxic_test_y = np.ravel(toxic_val_set.loc[:, ['score']])
-
 # Selected model: SVM, RandomForest, GBDT, XGboost, ExtraTrees
 
-# ////////////////////////////////////////////////////////////////
-# SVM
-# scale data for speeding up
-# scaling = MinMaxScaler(feature_range=(-1, 1)).fit(toxic_train_X)
-# toxic_train_X = scaling.transform(toxic_train_X)
-# clf_svm = svm.SVC(
-#     class_weight='balanced',
-# )
-# param_grid = {'C': [0.01, 0.1, 1, 10],
-#                 'gamma': [0.001, 0.01, 0.1]}
-# gs = GridSearchCV(estimator=clf_svm, param_grid=param_grid, scoring='roc_auc', cv=3, n_jobs=8, verbose=5)
-# gs.fit(toxic_train_X, toxic_train_y)
-# logger.info("best score (roc_auc) is %s" % gs.best_score_)
-# logger.info("best params are %s" % gs.best_params_)
-# ////////////////////////////////////////////////////////////////
+clf_svm = svm.SVC(
+         kernel='linear',
+         tol=1e-4,
+         class_weight='balanced',
+         verbose=True)
 
-# ////////////////////////////////////////////////////////////////
 # Random Forest
 clf_rf = RandomForestClassifier(
-    n_estimators=640,
-    max_depth=15,
-    min_samples_split=0.005,
-    min_samples_leaf=35,
+    n_estimators=100,
+    max_depth=5,
+    min_samples_split=0.01,
+    min_samples_leaf=5,
     max_features='auto',
     class_weight='balanced',
-    n_jobs=8,
+    n_jobs=4,
 )
-# base line model
-# Accuracy : 0.9395
-# AUC Score (Train): 0.869138
-# CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
-# misc.modelfit(clf_rf, toxic_train_X, toxic_train_y)
 
-# fine tune n_estimators
-# optimal: 500. Actually the larger n_estimators is, the better accuracy we obatin. But given the efficiency, we
-# make a trade-off here so as to select n_estimators as 500
-# param_grid = {"n_estimators": np.arange(50, 500, 50)}
-# gs = GridSearchCV(estimator=clf_rf, param_grid=param_grid, scoring='roc_auc', cv=5, n_jobs=8, verbose=1)
-# gs.fit(toxic_train_X, toxic_train_y)
-# print(gs.best_score_)
-# print(gs.best_params_)
-# for item in gs.grid_scores_:
-#     print("mean: %s, %s" % (item[1], str(item[0])))
-
-# fine tune max_depth and min_samples_split
-# optimal: max_depth: 15, min_samples_split: 0.005
-# param_grid = {"max_depth": np.arange(3, 16, 2),
-#                   "min_samples_split": np.arange(0.005, 0.021, 0.005)}
-# gs = GridSearchCV(estimator=clf_rf, param_grid=param_grid, scoring='roc_auc', cv=5, n_jobs=8, verbose=1)
-# gs.fit(toxic_train_X, toxic_train_y)
-# print(gs.best_score_)
-# print(gs.best_params_)
-# for item in gs.grid_scores_:
-#     print("mean: %s, %s" % (item[1], str(item[0])))
-
-# fine tune min_samples_split and min_samples_leaf
-# optimal: min_samples_split:0.005, min_samples_leaf:35
-# param_grid = {"min_samples_split": np.arange(0.005, 0.031, 0.005),
-#                   "min_samples_leaf": np.arange(5, 51, 5)}
-# gs = GridSearchCV(estimator=clf_rf, param_grid=param_grid, scoring='roc_auc', cv=5, n_jobs=8, verbose=1)
-# gs.fit(toxic_train_X, toxic_train_y)
-# logger.info("best score (roc_auc) is %s" % gs.best_score_)
-# logger.info("best params are %s" % gs.best_params_)
-# for item in gs.grid_scores_:
-#     logger.info("mean: %s, %s\n" % (item[1], str(item[0])))
-
-# fine tune max_features
-# optimal: max_features: 'auto'
-# feat_num = len(list(toxic_train_X.columns))
-# param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
-# gs = GridSearchCV(estimator=clf_rf, param_grid=param_grid, scoring='roc_auc', cv=5, n_jobs=8, verbose=1)
-# gs.fit(toxic_train_X, toxic_train_y)
-# logger.info("best score (roc_auc) is %s" % gs.best_score_)
-# logger.info("best params are %s" % gs.best_params_)
-# for item in gs.grid_scores_:
-#     logger.info("mean: %s, %s\n" % (item[1], str(item[0])))
-
-# refine-tune n_estimators
-# optimal: 640
-# param_grid = {"n_estimators": np.arange(40, 801, 40)}
-# gs = GridSearchCV(estimator=clf_rf, param_grid=param_grid, scoring='roc_auc', cv=5, n_jobs=8, verbose=1)
-# gs.fit(toxic_train_X, toxic_train_y)
-# logger.info("refine-tune n_estimator given all the other parameters have been optimized and fixed")
-# logger.info("best score (roc_auc) is %s" % gs.best_score_)
-# logger.info("best params are %s" % gs.best_params_)
-# for item in gs.grid_scores_:
-#     logger.info("mean: %s, %s\n" % (item[1], str(item[0])))
-
-# With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
-# clf_rf.fit(toxic_train_X, toxic_train_y)
-# score_auc = cross_val_score(clf_rf, toxic_train_X, toxic_train_y, cv=10, scoring='roc_auc', n_jobs=8).mean()
-# score_acc = cross_val_score(clf_rf, toxic_train_X, toxic_train_y, cv=10, scoring='accuracy', n_jobs=8).mean()
-# logger.info("After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
-# ////////////////////////////////////////////////////////////////
-
-# ////////////////////////////////////////////////////////////////
 # GBDT
 clf_gb = GradientBoostingClassifier(
-    learning_rate=0.075,
-    n_estimators=800,
-    max_depth=13,
-    min_samples_split=0.015,
+    learning_rate=0.1,
+    n_estimators=100,
+    max_depth=5,
+    min_samples_split=0.01,
     min_samples_leaf=5,
-    max_features=32,
-    subsample=0.75)
-
-# base line model
-# Accuracy : 0.9409
-# AUC Score (Train): 0.866622
-# CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
-# misc.modelfit(clf_gb, toxic_train_X, toxic_train_y)
-
-# fine tune n_estimators
-# optimal: n_estimators: 300
-# param_grid = {"n_estimators": np.arange(100, 501, 50)}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='GBDT')
-
-# fine tune max_depth and min_samples_split
-# optimal: max_depth: 13, min_samples_split: 0.015
-# param_grid = {"max_depth": np.arange(3, 16, 2),
-#                 "min_samples_split": np.arange(0.005, 0.021, 0.005)}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='GBDT')
-
-# fine tune min_samples_split and min_samples_leaf
-# optimal: min_samples_split: 0.015, min_samples_leaf: 5
-# param_grid = {"min_samples_split": [0.01, 0.015, 0.02],
-#                 "min_samples_leaf": [5, 15] + (list(np.arange(10, 71, 10)))}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='GBDT')
-
-# fine tune max_features
-# optimal: max_features: selected 32 here which is corresponding to auc score 0.879426. The reason we neglect max_depth
-# as 64 is because too high value of max_features may result in overfitting
-# param_grid = {"max_features": [60, 66, 72, 78, 84]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='GBDT')
-
-# fine tune subsample
-# optimal: subsample: 0.75
-# param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='GBDT')
-
-# refine-tune n_estimatosr
-# param_grid = {"learning_rate": [0.2],
-#               "n_estimators": [300]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=1, method='GBDT')
-#
-# param_grid = {"learning_rate": [0.1],
-#               "n_estimators": [600]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=1, method='GBDT')
-#
-# param_grid = {"learning_rate": [0.075],
-#               "n_estimators": [800]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=1, method='GBDT')
-#
-# param_grid = {"learning_rate": [0.05],
-#               "n_estimators": [1200]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=1, method='GBDT')
-#
-# param_grid = {"learning_rate": [0.04],
-#               "n_estimators": [1500]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=1, method='GBDT')
-#
-# param_grid = {"learning_rate": [0.03],
-#               "n_estimators": [2000]}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_gb, param_grid, sample_weight=True, cv=5,
-#                     scoring='roc_auc', n_jobs=1, method='GBDT')
-
-# With optimization, the optimal auc is 0.8751157067, the optimal accuracy is 0.945090275
-# clf_gb.fit(toxic_train_X, toxic_train_y)
-# score_auc = cross_val_score(clf_gb, toxic_train_X, toxic_train_y, cv=10, scoring='roc_auc').mean()
-# score_acc = cross_val_score(clf_gb, toxic_train_X, toxic_train_y, cv=10, scoring='accuracy').mean()
-# logger.info("After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
-# ////////////////////////////////////////////////////////////////
+    max_features='auto'
+)
 
 # Xgboost
 clf_xgb = xgb.XGBClassifier(
-    learning_rate=0.1,
-    n_estimators=307,
-    max_depth=35,
+    learning_rate=0.01,
+    n_estimators=100,
+    max_depth=5,
     min_child_weight=1,
-    gamma=0.1,
-    subsample=0.6,
-    colsample_bytree=0.65,
     nthread=4,
     scale_pos_weight=1)
 
-misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
-# base line model
-# Accuracy : 0.9444
-# AUC Score (Train): 0.877955
-# misc.modelfit(clf_gb, toxic_train_X, toxic_train_y)
+# Extremely Randomized Trees
+clf_ext = ExtraTreesClassifier(
+    n_estimators=100,
+    max_depth=5,
+    min_samples_split=0.01,
+    min_samples_leaf=5,
+    max_features='auto',
+    class_weight='balanced',
+    n_jobs=4,
+    bootstrap=True,
+    oob_score=True,
+)
 
-# fine tune max_depth and min_child_weight(min_child_leaf)
-# optimal: max_depth: 15, min_child_weight: 1
-# param_grid = {"max_depth": np.arange(3, 16, 2),
-#                 "min_child_weight": np.arange(1, 10, 2)}
-#
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='XGBoost')
+# meta_classifier as logistic regression
+lr_stack = LogisticRegression(
+    class_weight='balanced',
+    solver='sag',
+    max_iter=1000,
+    n_jobs=4,
+    verbose=2
+)
 
-# refine-tune max_depth
-# optimal: max_depth: 35
-# param_grid = {"max_depth": [15, 16, 17],
-#               "min_child_weight": [1, 2]}
-#
-#  misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='XGBoost')
-#  param_grid = {"max_depth": [23, 25, 27, 29, 31, 33, 35, 37, 39]}
-#  misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='XGBoost')
+xgb_stack = xgb.XGBClassifier(
+    learning_rate=0.1,
+    n_estimators=600,
+    max_depth=5,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    scale_pos_weight=1,
+    n_jobs=4
+)
 
-# fine tune gamma
-# optimal: gamma: 0.1
-# param_grid = {"gamma": np.arange(0, 0.5, 0.1)}
-# misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-#                     scoring='roc_auc', n_jobs=8, method='XGBoost')
 
-# fine tune subsample and colsample_bytree
-# optimal: subsample: 0.6 colsaumple_bytree: 0.65
-# param_grid = {"subsample": np.arange(0.6, 1, 0.1),
-#                 "colsample_bytree": np.arange(0.6, 1, 0.1)}
-# ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-#                             scoring='roc_auc', n_jobs=4, method='XGBoost')
-# opt_subsample = ret['subsample']
-# opt_colsubmple = ret['colsample_bytree']
-# clf_xgb.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
-#
-# param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
-#                 "colsample_bytree": [opt_colsubmple - 0.05, opt_colsubmple, opt_colsubmple+ 0.05]}
-# ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-#                     scoring='roc_auc', n_jobs=4, method='XGBoost')
-# opt_subsample = ret['subsample']
-# opt_colsubmple = ret['colsample_bytree']
-# clf_xgb.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
+def train_SVM(estimator, trainX, trainY, method, skip=False):
+    if not skip:
+        # SVM
+        # scale data for speeding up
+        scaling = MinMaxScaler(feature_range=(-1, 1)).fit(trainX)
+        transformed_trainX = scaling.transform(trainX)
+        param_grid = {'C': [1, 10, 100]}
+        best_params, best_score = misc.run_gridsearch(transformed_trainX, trainY, estimator, param_grid, cv=3,
+                                                      sample_weight=False,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(C=best_params['C'], gamma=best_params['gamma'])
+    return estimator
+
+
+def train_RF(estimator, trainX, trainY, method, skip=False):
+    if not skip:
+        # RandomForest
+        logger = misc.init_logger(method)
+        # base line model
+        # Accuracy : 0.9395
+        # AUC Score (Train): 0.869138
+        # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
+        misc.modelfit(estimator, trainX, trainY, method)
+
+        # fine tune n_estimators
+        param_grid = {"n_estimators": np.arange(50, 601, 50)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(n_estimators=best_params['n_estimators'])
+
+        # fine tune max_depth and min_samples_split
+        param_grid = {"max_depth": np.arange(5, 36, 2),
+                      "min_samples_split": np.arange(0.005, 0.031, 0.005)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
+
+        # fine tune min_samples_split and min_samples_leaf
+        param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
+
+        # fine tune max_features
+        feat_num = len(list(trainX.columns))
+        param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_features=best_params['max_features'])
+
+        # refine-tune n_estimators
+        param_grid = {"n_estimators": np.arange(40, 801, 40)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(n_estimators=best_params['n_estimators'])
+
+        # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
+        estimator.fit(trainX, trainY)
+        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=4).mean()
+        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=4).mean()
+        logger.info(
+            "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+    return estimator
+
+
+def train_GBDT(estimator, trainX, trainY, method, skip=False):
+    if not skip:
+        # GBDT
+        logger = misc.init_logger(method)
+        # base line model
+        # Accuracy : 0.9409
+        # AUC Score (Train): 0.866622
+        # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
+        misc.modelfit(estimator, trainX, trainY, method)
+
+        # fine tune n_estimators
+        param_grid = {"n_estimators": np.arange(50, 601, 50)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        best_n_estimators = best_params['n_estimators']
+        estimator.set_params(n_estimators=best_n_estimators)
+
+        # fine tune max_depth and min_samples_split
+        param_grid = {"max_depth": np.arange(5, 36, 2),
+                      "min_samples_split": np.arange(0.005, 0.031, 0.005)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
+
+        # fine tune min_samples_split and min_samples_leaf
+        param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
+
+        # fine tune max_features
+        feat_num = len(list(trainX.columns))
+        param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_features=best_params['max_features'])
+
+        # fine tune subsample
+        param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9]}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(subsample=best_params['subsample'])
+
+        # refine-tune n_estimatosr
+        pairs = [(0.1, best_n_estimators),
+                 (0.075, int(best_n_estimators * 4 / 3)),
+                 (0.05, best_n_estimators * 2),
+                 (0.04, best_n_estimators * 2),
+                 (0.03, best_n_estimators * 3),
+                 (0.01, best_n_estimators * 10)]
+        opt_params = None
+        opt_score = 0.0
+        for learning_rate, n_estimators in pairs:
+            estimator.set_params(learning_rate=learning_rate, n_estimators=n_estimators)
+            cv_score = misc.modelfit(estimator, trainX, trainY, method)
+            logger.info("learning_rate is %s, n_estimators is %s. With these values, cv_score is %s" % (
+            learning_rate, n_estimators, cv_score))
+            if cv_score > opt_score:
+                opt_params = (learning_rate, n_estimators)
+                opt_score = cv_score
+        logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding cv_score is %s" % (
+        opt_params[0], opt_params[1], opt_score))
+        estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
+
+        # With optimization, the optimal auc is 0.8751157067, the optimal accuracy is 0.945090275
+        estimator.fit(trainX, trainY)
+        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc').mean()
+        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy').mean()
+        logger.info(
+            "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+    return estimator
+
+
+def train_XGB(estimator, trainX, trainY, method, skip=False):
+    if not skip:
+        # Xgboost
+        logger = misc.init_logger(method)
+        # base line model
+        # Accuracy : 0.9444
+        # AUC Score (Train): 0.877955
+        cv_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method)
+        estimator.set_params(n_estimators=best_n_estimators)
+
+        # fine tune max_depth and min_child_weight(min_child_leaf)
+        param_grid = {"max_depth": np.arange(5, 40, 2),
+                      "min_child_weight": np.arange(1, 8, 2)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_depth=best_params['max_depth'], min_child_weight=best_params['min_child_weight'])
+
+        # refine-tune max_depth and min_child_weight
+        opt_max_depth = best_params['max_depth']
+        opt_min_child_weight = best_params['min_child_weight']
+        param_grid = {"max_depth": [opt_max_depth - 1, opt_max_depth, opt_max_depth + 1],
+                      "min_child_weight": [1, 2] if opt_min_child_weight == 1 else [opt_min_child_weight - 1,
+                                                                                    opt_min_child_weight,
+                                                                                    opt_min_child_weight + 1]}
+
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_depth=best_params['max_depth'], min_child_weight=best_params['min_child_weight'])
+
+        # fine tune gamma
+        param_grid = {"gamma": np.arange(0, 0.5, 0.1)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(gamma=best_params['gamma'])
+
+        # fine tune subsample and colsample_bytree
+        param_grid = {"subsample": np.arange(0.6, 1, 0.1),
+                      "colsample_bytree": np.arange(0.6, 1, 0.1)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        opt_subsample = best_params['subsample']
+        opt_colsubmple = best_params['colsample_bytree']
+        estimator.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
+
+        param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
+                      "colsample_bytree": [opt_colsubmple - 0.05, opt_colsubmple, opt_colsubmple + 0.05]}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(subsample=best_params['subsample'], colsample_bytree=best_params['colsample_bytree'])
+
+        param_grid = {"reg_lambda": [1e-2, 0.1, 1, 10, 100]}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        opt_lambda = best_params['reg_lambda']
+        param_grid = {
+            "reg_lambda": [0, opt_lambda / 5.0, opt_lambda / 2.0, opt_lambda, opt_lambda * 2.0, opt_lambda * 5.0]}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(reg_lambda=best_params['reg_lambda'])
+
+        # refine tune learning_rate and n_estimators
+        learning_rates = [0.01, 0.025, 0.05, 0.075]
+        opt_params = None
+        opt_score = 0.0
+        for learning_rate in learning_rates:
+            estimator.set_params(learning_rate=learning_rate, n_estimators=5000)
+            cv_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method)
+            logger.info("learning_rate is %s, n_estimators is %s. With these values, cv_score is %s" % (
+                learning_rate, best_iter, cv_score))
+            if cv_score > opt_score:
+                opt_params = (learning_rate, best_iter)
+                opt_score = cv_score
+        logger.info("After parameters tuning. "
+                    "Best learning_rate is %s, best n_estimators is %s. The corresponding cv_score is %s" % (
+                        opt_params[0], opt_params[1], opt_score))
+        estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
+    return estimator
+
+
+def train_EXT(estimator, trainX, trainY, method, skip=False):
+    if not skip:
+        # Extremely Randomized Trees
+        logger = misc.init_logger(method)
+        # base line model
+        # Accuracy : 0.9395
+        # AUC Score (Train): 0.869138
+        # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
+        misc.modelfit(estimator, trainX, trainY, method)
+
+        # fine tune n_estimators
+        param_grid = {"n_estimators": np.arange(50, 601, 50)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(n_estimators=best_params['n_estimators'])
+
+        # fine tune max_depth and min_samples_split
+        param_grid = {"max_depth": np.arange(5, 36, 2),
+                      "min_samples_split": np.arange(0.005, 0.031, 0.005)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
+
+        # fine tune min_samples_split and min_samples_leaf
+        param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
+
+        # fine tune max_features
+        feat_num = len(list(trainX.columns))
+        param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(max_features=best_params['max_features'])
+
+        # refine-tune n_estimators
+        param_grid = {"n_estimators": np.arange(40, 801, 40)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
+                                                      scoring='roc_auc', n_jobs=4, method=method)
+        estimator.set_params(n_estimators=best_params['n_estimators'])
+
+        # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
+        estimator.fit(trainX, trainY)
+        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=4).mean()
+        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=4).mean()
+        logger.info(
+            "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+    return estimator
+
+
+def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, skip=False):
+    if not skip:
+        # Ensemble
+        logger = misc.init_logger(method)
+
+        clf_vote_soft = VotingClassifier(
+            estimators=[
+                ('svm', clf_svm),
+                ('rf', clf_rf),
+                ('gbdt', clf_gb),
+                ('xgboost', clf_xgb),
+                ('extraTree', clf_ext)
+            ],
+            weights=[1, 2, 2, 3, 1],
+            voting='soft',
+        )
+
+        sclf = StackingClassifier(classifiers=[clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext],
+                                  meta_classifier=lr_stack,
+                                  verbose=1)
+
+        sclf_prob = StackingClassifier(classifiers=[clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext],
+                                       use_probas=True,
+                                       average_probas=False,
+                                       meta_classifier=lr_stack,
+                                       verbose=1)
+
+        sclf_xgb = StackingClassifier(classifiers=[clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext],
+                                      meta_classifier=xgb_stack,
+                                      verbose=1)
+
+        for clf, label in zip([clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft, sclf, sclf_prob, sclf_xgb],
+                              ['SVM',
+                               'Random Forest',
+                               'GBDT',
+                               'XGBoost',
+                               'ExtraTrees',
+                               'SoftVotingClassifier',
+                               'StackingClassifier',
+                               'StackingClassifierWithProb',
+                               'StackingClassifierWithXGB']):
+            clf.fit(trainX, trainY)
+            score_auc = cross_val_score(clf, trainX, trainY, cv=5, scoring='roc_auc', verbose=1).mean()
+            score_acc = cross_val_score(clf, trainX, trainY, cv=5, scoring='accuracy', verbose=1).mean()
+            logger.info(
+                'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+                    label, score_auc, score_acc))
+
+        joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
+        joblib.dump(sclf, 'models/%s_lr_stack.model' % method)
+        joblib.dump(sclf_prob, 'models/%s_lr_stack_prob.model' % method)
+        joblib.dump(sclf_xgb, 'models/%s_lr_stack_xgb.model' % method)
+
 
 if __name__ == "__main__":
-    # param_grid = {"reg_lambda": [1e-2, 0.1, 1, 10, 100]}
-    # misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-    #                     scoring='roc_auc', n_jobs=8, method='XGBoost')
-    param_grid = {"reg_lambda": [0, 0.1, 0.5, 1, 5]}
-    ret = misc.run_gridsearch(toxic_train_X, toxic_train_y, clf_xgb, param_grid, sample_weight=False, cv=5,
-                        scoring='roc_auc', n_jobs=8, method='XGBoost')
-    clf_xgb.set_params(reg_lambda=ret['reg_lambda'])
+    comment_type = os.path.splitext(os.path.basename(__file__))[0]
 
-    clf_xgb.set_params(learning_rate=0.01, n_estimators=5000)
-    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+    # Generate vocabulary
+    vocab = misc.sumForToxicType(train_set)
 
-    clf_xgb.set_params(learning_rate=0.025, n_estimators=5000)
-    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+    # Feature engineering
+    train_set = misc.feature_engineering(train_set, vocab, comment_type, csv='dataset/%s_train.csv' % comment_type)
 
-    clf_xgb.set_params(learning_rate=0.05, n_estimators=5000)
-    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+    # Modeling
+    # train_set, val_set = train_test_split(train_set, test_size=0.2, random_state=0)
+    trainX = train_set.drop(['score', 'id', 'comment_text'], axis=1).loc[:]
+    trainY = np.ravel(train_set.loc[:, ['score']])
+    # testX = val_set.drop(['score', 'id', 'comment_text'], axis=1).loc[:]
+    # testY = np.ravel(val_set.loc[:, ['score']])
 
-    clf_xgb.set_params(learning_rate=0.075, n_estimators=5000)
-    misc.modelfit_xgboost(clf_xgb, toxic_train_X, toxic_train_y)
+    clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type)
+    clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type)
+    clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type)
+    clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type)
+    clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type)
+
+    run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type)
