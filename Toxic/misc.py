@@ -255,7 +255,7 @@ def run_gridsearch(X, y, estimator, param_grid, **params):
 
 
 def init_logger(model):
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger(__name__ + '.' + model)
     logger.setLevel(level=logging.INFO)
     logging_dir = os.path.join(os.path.dirname(__file__), "log")
     if not os.path.exists(logging_dir):
