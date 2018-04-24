@@ -423,6 +423,7 @@ def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, meth
 
 if __name__ == "__main__":
     comment_type = os.path.splitext(os.path.basename(__file__))[0]
+    print("Start to process comment type: %s" % comment_type)
 
     # Generate vocabulary
     vocab = misc.sumForToxicType(train_set)
