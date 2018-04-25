@@ -184,58 +184,35 @@ def feature_engineering(original_data, vocab, type, is_test=False, csv=None):
     return modified_data
 
 
-def modelfit(estimator, train_set, target_set, method, performCV=True, cv_folds=5):
+def modelfit(estimator, train_set, target_set, method, cv_folds=5, n_jobs=4):
     logger = init_logger(method)
     # Fit the estimatororithm on the data
     estimator.fit(train_set, target_set)
 
-    # Predict training set:
-    train_predictions = estimator.predict(train_set)
-    train_predprob = estimator.predict_proba(train_set)[:, 1]
-
-    # Print model report:
-    logger.info("\nModel Report")
-    logger.info("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
-    logger.info("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
-
     # Perform cross-validation
-    cv_score = 0
-    if performCV:
-        cv_score = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc')
-        logger.info("CV Score : Mean - %.7g | Std - %.7g | Min - %.7g | Max - %.7g" %
-              (np.mean(cv_score), np.std(cv_score), np.min(cv_score), np.max(cv_score)))
-    return cv_score
+    score_auc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
+    score_acc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
+    logger.info("Average roc_auc score : %.10f, average accuracy score: %.10f" % (score_auc, score_acc))
+    return score_auc, score_acc
 
 
-def modelfit_xgboost(estimator, train_set, target_set, method, performCV=True, cv_folds=5, early_stopping_rounds=50):
+def modelfit_xgboost(estimator, train_set, target_set, method, cv_folds=5, early_stopping_rounds=50, n_jobs=4):
     logger = init_logger(method)
 
     # Fit the algorithm on the data
+    xgb_param = estimator.get_xgb_params()
+    xgtrain = xgb.DMatrix(train_set, label=target_set)
+    cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=estimator.get_params()['n_estimators'], nfold=cv_folds,
+                        metrics='auc', early_stopping_rounds=early_stopping_rounds, verbose_eval=True)
+    best_iter = cvresult.shape[0]
+    logger.info("Best iteration: %s" % str(best_iter))
+    estimator.set_params(n_estimators=best_iter)
+
     estimator.fit(train_set, target_set, eval_metric='auc')
-
-    # Predict training set:
-    train_predictions = estimator.predict(train_set)
-    train_predprob = estimator.predict_proba(train_set)[:, 1]
-
-    # Print model report:
-    logger.info("\nModel Report pf XGBoost")
-    logger.info("Accuracy : %.4g" % metrics.accuracy_score(target_set, train_predictions))
-    logger.info("AUC Score (Train): %f" % metrics.roc_auc_score(target_set, train_predprob))
-
-    best_iter = 100
-    cv_score = 0
-    if performCV is True:
-        xgb_param = estimator.get_xgb_params()
-        xgtrain = xgb.DMatrix(train_set, label=target_set)
-        cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=estimator.get_params()['n_estimators'], nfold=cv_folds,
-                          metrics='auc', early_stopping_rounds=early_stopping_rounds, verbose_eval=True)
-        best_iter = cvresult.shape[0]
-        logger.info("Best iteration: %s" % str(best_iter))
-        estimator.set_params(n_estimators=best_iter)
-        cv_score = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc')
-        logger.info("CV Score : Mean - %.7g | Std - %.7g | Min - %.7g | Max - %.7g" %
-              (np.mean(cv_score), np.std(cv_score), np.min(cv_score), np.max(cv_score)))
-    return cv_score, best_iter
+    score_auc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
+    score_acc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
+    logger.info("Average roc_auc score : %.10f, average accuracy score: %.10f" % (score_auc, score_acc))
+    return score_auc, score_acc, best_iter
 
 
 def run_gridsearch(X, y, estimator, param_grid, **params):

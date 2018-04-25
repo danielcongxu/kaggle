@@ -13,7 +13,6 @@ from mlxtend.classifier import StackingClassifier
 from sklearn.ensemble import VotingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import cross_val_score
 from sklearn import svm
 import xgboost as xgb
 
@@ -32,6 +31,7 @@ test_set = pd.read_csv("dataset/test.csv")
 
 clf_svm = svm.SVC(
          kernel='linear',
+         C=100,
          tol=1e-4,
          class_weight='balanced',
          verbose=True)
@@ -102,6 +102,7 @@ xgb_stack = xgb.XGBClassifier(
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # SVM
     logger = misc.init_logger(method)
+    logger.info("Begin to train SVM...")
     if not skip:
         # scale data for speeding up
         scaling = MinMaxScaler(feature_range=(-1, 1)).fit(trainX)
@@ -118,6 +119,7 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # RandomForest
     logger = misc.init_logger(method)
+    logger.info("Begin to train RandomForest...")
     if not skip:
         # base line model
         # Accuracy : 0.9395
@@ -132,7 +134,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # fine tune max_depth and min_samples_split
-        param_grid = {"max_depth": np.arange(5, 36, 2),
+        param_grid = {"max_depth": np.arange(5, 30, 2),
                       "min_samples_split": np.arange(0.005, 0.031, 0.005)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
@@ -158,11 +160,8 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
-        estimator.fit(trainX, trainY)
-        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=n_jobs).mean()
-        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
-        logger.info(
-            "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+        logger.info("After parameters tuning, Get the CV score...")
+        misc.modelfit(estimator, trainX, trainY, method)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -170,6 +169,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # GBDT
     logger = misc.init_logger(method)
+    logger.info("Begin to train GBDT...")
     if not skip:
         # base line model
         # Accuracy : 0.9409
@@ -185,7 +185,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(n_estimators=best_n_estimators)
 
         # fine tune max_depth and min_samples_split
-        param_grid = {"max_depth": np.arange(5, 36, 2),
+        param_grid = {"max_depth": np.arange(5, 30, 2),
                       "min_samples_split": np.arange(0.005, 0.031, 0.005)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
@@ -221,22 +221,19 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_score = 0.0
         for learning_rate, n_estimators in pairs:
             estimator.set_params(learning_rate=learning_rate, n_estimators=n_estimators)
-            cv_score = misc.modelfit(estimator, trainX, trainY, method)
-            logger.info("learning_rate is %s, n_estimators is %s. With these values, cv_score is %s" % (
-            learning_rate, n_estimators, cv_score))
-            if cv_score > opt_score:
+            auc_score, acc_score = misc.modelfit(estimator, trainX, trainY, method)
+            logger.info("learning_rate is %s, n_estimators is %s. With these values, auc_score is %s, acc_score is %s" % (
+            learning_rate, n_estimators, auc_score, acc_score))
+            if auc_score > opt_score:
                 opt_params = (learning_rate, n_estimators)
-                opt_score = cv_score
-        logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding cv_score is %s" % (
+                opt_score = auc_score
+        logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
         opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
 
         # With optimization, the optimal auc is 0.8751157067, the optimal accuracy is 0.945090275
-        estimator.fit(trainX, trainY)
-        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=n_jobs).mean()
-        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
-        logger.info(
-            "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+        logger.info("After parameters tuning, Get the CV score...")
+        misc.modelfit(estimator, trainX, trainY, method)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -244,15 +241,16 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Xgboost
     logger = misc.init_logger(method)
+    logger.info("Begin to train XGBoost...")
     if not skip:
         # base line model
         # Accuracy : 0.9444
         # AUC Score (Train): 0.877955
-        cv_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method)
+        auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method)
         estimator.set_params(n_estimators=best_n_estimators)
 
         # fine tune max_depth and min_child_weight(min_child_leaf)
-        param_grid = {"max_depth": np.arange(5, 40, 2),
+        param_grid = {"max_depth": np.arange(5, 30, 2),
                       "min_child_weight": np.arange(1, 8, 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
@@ -307,16 +305,15 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_score = 0.0
         for learning_rate in learning_rates:
             estimator.set_params(learning_rate=learning_rate, n_estimators=5000)
-            cv_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method)
-            logger.info("learning_rate is %s, n_estimators is %s. With these values, cv_score is %s" % (
-                learning_rate, best_iter, cv_score))
-            if cv_score > opt_score:
+            auc_score, acc_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method)
+            logger.info("learning_rate is %s, n_estimators is %s. With these values, auc_score is %s, acc_score is %s" % (
+                learning_rate, best_iter, auc_score, acc_score))
+            if auc_score > opt_score:
                 opt_params = (learning_rate, best_iter)
-                opt_score = cv_score
-        logger.info("After parameters tuning. "
-                    "Best learning_rate is %s, best n_estimators is %s. The corresponding cv_score is %s" % (
-                        opt_params[0], opt_params[1], opt_score))
+                opt_score = auc_score
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
+        logger.info("After parameters tuning, Get the CV score...")
+        misc.modelfit_xgboost(estimator, trainX, trainY, method)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -324,6 +321,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Extremely Randomized Trees
     logger = misc.init_logger(method)
+    logger.info("Begin to train ExtraTrees...")
     if not skip:
         # base line model
         # Accuracy : 0.9395
@@ -338,7 +336,7 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # fine tune max_depth and min_samples_split
-        param_grid = {"max_depth": np.arange(5, 36, 2),
+        param_grid = {"max_depth": np.arange(5, 30, 2),
                       "min_samples_split": np.arange(0.005, 0.031, 0.005)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
@@ -364,11 +362,8 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
         # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
-        estimator.fit(trainX, trainY)
-        score_auc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='roc_auc', n_jobs=n_jobs).mean()
-        score_acc = cross_val_score(estimator, trainX, trainY, cv=5, scoring='accuracy', n_jobs=n_jobs).mean()
-        logger.info(
-            "After parameters tuning: average roc_auc is %.10f, average accuracy is %.10f" % (score_auc, score_acc))
+        logger.info("After parameters tuning, Get the CV score...")
+        misc.modelfit(estimator, trainX, trainY, method)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -376,6 +371,7 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip=False):
     # Ensemble
     logger = misc.init_logger(method)
+    logger.info("Begin to Ensemble...")
     if not skip:
         clf_vote_soft = VotingClassifier(
             estimators=[
@@ -413,12 +409,11 @@ def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, meth
                                'StackingClassifier',
                                'StackingClassifierWithProb',
                                'StackingClassifierWithXGB']):
-            clf.fit(trainX, trainY)
-            score_auc = cross_val_score(clf, trainX, trainY, cv=5, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
-            score_acc = cross_val_score(clf, trainX, trainY, cv=5, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
+            logger.info("Begin to compare CV scores between different classifiers when ensembling...")
+            auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method)
             logger.info(
                 'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
-                    label, score_auc, score_acc))
+                    label, auc_score, acc_score))
 
         joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
         joblib.dump(sclf, 'models/%s_lr_stack.model' % method)
@@ -443,7 +438,7 @@ if __name__ == "__main__":
     # testX = val_set.drop(['score', 'id', 'comment_text'], axis=1).loc[:]
     # testY = np.ravel(val_set.loc[:, ['score']])
 
-    clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type)
+    clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type, skip=True)
     clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type)
     clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type)
     clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type)
