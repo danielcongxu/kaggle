@@ -226,8 +226,8 @@ def run_gridsearch(X, y, estimator, param_grid, **params):
         for item in gs.grid_scores_:
             logger.info("mean: %s, %s\n" % (item[1], str(item[0])))
         return gs.best_params_, gs.best_score_
-    except Exception:
-        logger.error("Error found! Break down...\n")
+    except Exception as errinfo:
+        logger.error("%s\nError found! Break down...\n" % errinfo)
 
 
 def init_logger(model):
