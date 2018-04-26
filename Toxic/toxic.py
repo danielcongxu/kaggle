@@ -59,11 +59,12 @@ clf_gb = GradientBoostingClassifier(
 # Xgboost
 clf_xgb = xgb.XGBClassifier(
     learning_rate=0.1,
-    n_estimators=100,
+    n_estimators=5000,
     max_depth=5,
     min_child_weight=1,
     nthread=4,
-    scale_pos_weight=1)
+    scale_pos_weight=1
+)
 
 # Extremely Randomized Trees
 clf_ext = ExtraTreesClassifier(
