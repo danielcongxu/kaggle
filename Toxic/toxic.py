@@ -125,7 +125,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         # Accuracy : 0.9395
         # AUC Score (Train): 0.869138
         # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
-        misc.modelfit(estimator, trainX, trainY, method)
+        misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
         param_grid = {"n_estimators": np.arange(50, 601, 50)}
@@ -164,7 +164,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 
         # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
         logger.info("After parameters tuning, Get the CV score...")
-        misc.modelfit(estimator, trainX, trainY, method)
+        misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -178,7 +178,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         # Accuracy : 0.9409
         # AUC Score (Train): 0.866622
         # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
-        misc.modelfit(estimator, trainX, trainY, method)
+        misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
         param_grid = {"n_estimators": np.arange(50, 601, 50)}
@@ -227,7 +227,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_score = 0.0
         for learning_rate, n_estimators in pairs:
             estimator.set_params(learning_rate=learning_rate, n_estimators=n_estimators)
-            auc_score, acc_score = misc.modelfit(estimator, trainX, trainY, method)
+            auc_score, acc_score = misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
             logger.info("learning_rate is %s, n_estimators is %s. With these values, auc_score is %s, acc_score is %s" % (
             learning_rate, n_estimators, auc_score, acc_score))
             if auc_score > opt_score:
@@ -239,7 +239,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 
         # With optimization, the optimal auc is 0.8751157067, the optimal accuracy is 0.945090275
         logger.info("After parameters tuning, Get the CV score...")
-        misc.modelfit(estimator, trainX, trainY, method)
+        misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -252,7 +252,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         # base line model
         # Accuracy : 0.9444
         # AUC Score (Train): 0.877955
-        auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method)
+        auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
         estimator.set_params(n_estimators=best_n_estimators)
 
         # fine tune max_depth and min_child_weight(min_child_leaf)
@@ -321,7 +321,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_score = 0.0
         for learning_rate in learning_rates:
             estimator.set_params(learning_rate=learning_rate, n_estimators=5000)
-            auc_score, acc_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method)
+            auc_score, acc_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
             logger.info("learning_rate is %s, n_estimators is %s. With these values, auc_score is %s, acc_score is %s" % (
                 learning_rate, best_iter, auc_score, acc_score))
             if auc_score > opt_score:
@@ -329,7 +329,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                 opt_score = auc_score
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
         logger.info("After parameters tuning, Get the CV score...")
-        misc.modelfit_xgboost(estimator, trainX, trainY, method)
+        misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -343,7 +343,7 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         # Accuracy : 0.9395
         # AUC Score (Train): 0.869138
         # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
-        misc.modelfit(estimator, trainX, trainY, method)
+        misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
         param_grid = {"n_estimators": np.arange(50, 601, 50)}
@@ -382,7 +382,7 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 
         # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
         logger.info("After parameters tuning, Get the CV score...")
-        misc.modelfit(estimator, trainX, trainY, method)
+        misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -429,7 +429,7 @@ def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, meth
                                'StackingClassifierWithProb',
                                'StackingClassifierWithXGB']):
             logger.info("Begin to compare CV scores between different classifiers when ensembling...")
-            auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method)
+            auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
             logger.info(
                 'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
                     label, auc_score, acc_score))
