@@ -31,7 +31,6 @@ test_set = pd.read_csv("dataset/test.csv")
 
 clf_svm = svm.SVC(
          kernel='linear',
-         C=100,
          tol=1e-4,
          class_weight='balanced',
          verbose=True)
@@ -211,7 +210,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
             estimator.set_params(max_features=best_params['max_features'])
 
         # fine tune subsample
-        param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9]}
+        param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(subsample=best_params['subsample'])
@@ -281,16 +280,25 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(gamma=best_params['gamma'])
 
         # fine tune subsample and colsample_bytree
-        param_grid = {"subsample": np.arange(0.6, 1, 0.1),
-                      "colsample_bytree": np.arange(0.6, 1, 0.1)}
+        param_grid = {"subsample": np.arange(0.6, 1.01, 0.1),
+                      "colsample_bytree": np.arange(0.6, 1.01, 0.1)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         opt_subsample = best_params['subsample']
-        opt_colsubmple = best_params['colsample_bytree']
-        estimator.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubmple)
+        opt_colsubsample = best_params['colsample_bytree']
+        estimator.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubsample)
 
-        param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
-                      "colsample_bytree": [opt_colsubmple - 0.05, opt_colsubmple, opt_colsubmple + 0.05]}
+        if opt_subsample != 1.0 and opt_colsubsample != 1.0:
+            param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
+                          "colsample_bytree": [opt_colsubsample - 0.05, opt_colsubsample, opt_colsubsample + 0.05]}
+        elif opt_subsample != 1.0:
+            param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
+                          "colsample_bytree": [1.0]}
+        elif opt_colsubsample != 1.0:
+            param_grid = {"subsample": [1.0],
+                          "colsample_bytree": [opt_colsubsample - 0.05, opt_colsubsample, opt_colsubsample + 0.05]}
+        else:
+            param_grid = {"subsample": [1.0], "colsample_bytree": [1.0]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(subsample=best_params['subsample'], colsample_bytree=best_params['colsample_bytree'])
@@ -447,7 +455,7 @@ if __name__ == "__main__":
     # testX = val_set.drop(['score', 'id', 'comment_text'], axis=1).loc[:]
     # testY = np.ravel(val_set.loc[:, ['score']])
 
-    clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type, skip=True)
+    clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type)
     clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type)
     clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type)
     clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type)
