@@ -58,7 +58,7 @@ clf_gb = GradientBoostingClassifier(
 
 # Xgboost
 clf_xgb = xgb.XGBClassifier(
-    learning_rate=0.01,
+    learning_rate=0.1,
     n_estimators=100,
     max_depth=5,
     min_child_weight=1,
@@ -303,6 +303,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(subsample=best_params['subsample'], colsample_bytree=best_params['colsample_bytree'])
 
+        # fine tune reg_lambda
         param_grid = {"reg_lambda": [1e-2, 0.1, 1, 10, 100]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
