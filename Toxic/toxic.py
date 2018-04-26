@@ -111,7 +111,7 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(transformed_trainX, trainY, estimator, param_grid, cv=3,
                                                       sample_weight=False,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
-        estimator.set_params(C=best_params['C'], gamma=best_params['gamma'])
+        estimator.set_params(C=best_params['C'])
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
@@ -151,7 +151,10 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
-        estimator.set_params(max_features=best_params['max_features'])
+        if best_params['max_features'] == int(np.sqrt(feat_num)):
+            estimator.set_params(max_features='auto')
+        else:
+            estimator.set_params(max_features=best_params['max_features'])
 
         # refine-tune n_estimators
         param_grid = {"n_estimators": np.arange(40, 801, 40)}
@@ -202,7 +205,10 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
-        estimator.set_params(max_features=best_params['max_features'])
+        if best_params['max_features'] == int(np.sqrt(feat_num)):
+            estimator.set_params(max_features='auto')
+        else:
+            estimator.set_params(max_features=best_params['max_features'])
 
         # fine tune subsample
         param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9]}
@@ -353,7 +359,10 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
-        estimator.set_params(max_features=best_params['max_features'])
+        if best_params['max_features'] == int(np.sqrt(feat_num)):
+            estimator.set_params(max_features='auto')
+        else:
+            estimator.set_params(max_features=best_params['max_features'])
 
         # refine-tune n_estimators
         param_grid = {"n_estimators": np.arange(40, 801, 40)}
@@ -429,7 +438,7 @@ if __name__ == "__main__":
     vocab = misc.sumForToxicType(train_set)
 
     # Feature engineering
-    train_set = misc.feature_engineering(train_set, vocab, comment_type, csv='dataset/%s_train.csv' % comment_type)
+    train_set = misc.feature_engineering(train_set, vocab, comment_type)
 
     # Modeling
     # train_set, val_set = train_test_split(train_set, test_size=0.2, random_state=0)

@@ -161,9 +161,11 @@ def calc_toxic_word_index(content, vocab):
     return word_cnt
 
 
-def feature_engineering(original_data, vocab, type, is_test=False, csv=None):
+def feature_engineering(original_data, vocab, type, is_test=False):
     score_cols = ['toxic', 'severe_toxic', 'obscene', 'threat', 'insult', 'identity_hate']
-    if not csv:
+    csv_path = os.path.join(os.path.dirname(__file__), 'dataset',
+                            "%s_%s.csv" % (str(type), 'test' if is_test else 'train'))
+    if not os.path.exists(csv_path):
         original_data['comment_text'] = original_data['comment_text'].str.strip()
         modified_data = original_data.drop(score_cols, axis=1).join(pd.DataFrame(data=np.zeros((len(original_data), len(vocab[type]))),
                                                   columns=vocab[type].keys(), dtype=np.int))
@@ -175,12 +177,9 @@ def feature_engineering(original_data, vocab, type, is_test=False, csv=None):
 
         if not is_test:
             modified_data['score'] = original_data[type]
-        csv_path = os.path.join(os.path.dirname(__file__), 'dataset', "%s_%s.csv" % (str(type), 'test' if is_test else 'train'))
-        if os.path.exists(csv_path):
-            os.remove(csv_path)
         modified_data.to_csv(csv_path, index=False)
     else:
-        modified_data = pd.read_csv(csv)
+        modified_data = pd.read_csv(csv_path)
     return modified_data
 
 
