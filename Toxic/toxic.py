@@ -316,7 +316,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(reg_lambda=best_params['reg_lambda'])
 
         # refine tune learning_rate and n_estimators
-        learning_rates = [0.01, 0.025, 0.05, 0.075]
+        learning_rates = [0.01, 0.025, 0.05, 0.075, 0.1]
         opt_params = None
         opt_score = 0.0
         for learning_rate in learning_rates:
