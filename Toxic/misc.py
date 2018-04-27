@@ -243,6 +243,7 @@ def init_logger(model):
 
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
 
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
