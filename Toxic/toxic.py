@@ -157,7 +157,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
             estimator.set_params(max_features=best_params['max_features'])
 
         # refine-tune n_estimators
-        param_grid = {"n_estimators": np.arange(40, 801, 40)}
+        param_grid = {"n_estimators": np.arange(40, 1001, 40)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
@@ -217,12 +217,13 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(subsample=best_params['subsample'])
 
         # refine-tune n_estimatosr
-        pairs = [(0.1, best_n_estimators),
+        pairs = [(0.1,   best_n_estimators),
                  (0.075, int(best_n_estimators * 4 / 3)),
-                 (0.05, best_n_estimators * 2),
-                 (0.04, best_n_estimators * 2),
-                 (0.03, best_n_estimators * 3),
-                 (0.01, best_n_estimators * 10)]
+                 (0.05,  best_n_estimators * 2),
+                 (0.04,  int(best_n_estimators * 2.5)),
+                 (0.03,  best_n_estimators * 10 / 3),
+                 (0.01,  best_n_estimators * 10),
+                 (0.005, best_n_estimators * 20)]
         opt_params = None
         opt_score = 0.0
         for learning_rate, n_estimators in pairs:
@@ -316,7 +317,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         estimator.set_params(reg_lambda=best_params['reg_lambda'])
 
         # refine tune learning_rate and n_estimators
-        learning_rates = [0.01, 0.025, 0.05, 0.075, 0.1]
+        learning_rates = [0.005, 0.01, 0.025, 0.05, 0.075, 0.1]
         opt_params = None
         opt_score = 0.0
         for learning_rate in learning_rates:
@@ -378,7 +379,7 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
             estimator.set_params(max_features=best_params['max_features'])
 
         # refine-tune n_estimators
-        param_grid = {"n_estimators": np.arange(40, 801, 40)}
+        param_grid = {"n_estimators": np.arange(40, 1001, 40)}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
