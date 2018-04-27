@@ -327,7 +327,10 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
             if auc_score > opt_score:
                 opt_params = (learning_rate, best_iter)
                 opt_score = auc_score
+        logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
+                    opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
+
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
