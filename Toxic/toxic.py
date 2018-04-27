@@ -422,6 +422,7 @@ def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, meth
                                       meta_classifier=xgb_stack,
                                       verbose=1)
 
+        logger.info("Begin to compare CV scores between different classifiers when ensembling...")
         for clf, label in zip([clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft, sclf, sclf_prob, sclf_xgb],
                               ['SVM',
                                'Random Forest',
@@ -432,7 +433,6 @@ def run_ensemble(clf_svm, clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, meth
                                'StackingClassifier',
                                'StackingClassifierWithProb',
                                'StackingClassifierWithXGB']):
-            logger.info("Begin to compare CV scores between different classifiers when ensembling...")
             auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
             logger.info(
                 'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
