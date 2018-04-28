@@ -1,5 +1,6 @@
 import os
 import re
+import copy
 import logging
 import pandas as pd
 import numpy as np
@@ -12,6 +13,7 @@ import xgboost as xgb
 from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import GridSearchCV
 from sklearn.utils.class_weight import compute_sample_weight
+import xml.etree.ElementTree as ET
 
 def preprocComments(content):
     # Lower case
@@ -251,4 +253,74 @@ def init_logger(model):
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     return logger
+
+
+def update_params_toXML(estimator, method, xmlPath):
+    logger = init_logger(method)
+    params = estimator.get_params()
+
+    if not os.path.exists(xmlPath):
+        top = ET.Element('root')
+        doc = ET.SubElement(top, 'Model', name=method)
+        for name, value in params.items():
+            if isinstance(value, str):
+                type = 'string'
+            elif isinstance(value, bool):
+                type = 'bool'
+            elif isinstance(value, int):
+                type = 'int'
+            elif isinstance(value, float):
+                type = 'float'
+            else:
+                type = 'None'
+            sub = ET.SubElement(doc, 'param', name=name, type=type)
+            sub.text = str(value)
+            sub.tail = '\n'
+        tree = ET.ElementTree(top)
+    else:
+        # The xml already exists
+        tree = ET.parse(xmlPath)
+        for model in tree.getroot().findall('Model'):
+            if model.attrib['name'] == method:
+                for elem in model:
+                    try:
+                        elem.text = str(params[elem.attrib['name']])
+                    except Exception:
+                        logger.info('Error found while updating parameters to %s!' % xmlPath)
+                        return
+                break
+    tree.write(xmlPath)
+    logger.info("Successfully Updating params to %s" % xmlPath)
+
+
+def load_params_fromXML(estimator, method, xmlPath):
+    logger = init_logger(method)
+
+    origin_estimator = copy.deepcopy(estimator)
+    tree = ET.parse(xmlPath)
+    for model in tree.getroot().findall('Model'):
+        if model.attrib['name'] == method:
+            for child in model:
+                name = child.attrib['name']
+                type = child.attrib['type']
+                try:
+                    if type == 'string':
+                        param_map = {name: str(child.text)}
+                    elif type == 'bool':
+                        param_map = {name: bool(child.text)}
+                    elif type == 'int':
+                        param_map = {name: int(child.text)}
+                    elif type == 'float':
+                        param_map = {name: float(child.text)}
+                    else:
+                        param_map = {name: None}
+                    estimator.set_params(**param_map)
+                except Exception:
+                    logger.info('Error found while loading parameters from %s' % xmlPath)
+                    return origin_estimator
+            logger.info('Successfully loading parameters from %s' % xmlPath)
+            logger.info('The load-in parameters are...')
+            logger.info(estimator.get_params(()))
+            break
+    return estimator
 
