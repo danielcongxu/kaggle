@@ -290,17 +290,17 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_colsubsample = best_params['colsample_bytree']
         estimator.set_params(subsample=opt_subsample, colsample_bytree=opt_colsubsample)
 
-        if opt_subsample != 1.0 and opt_colsubsample != 1.0:
+        if abs(opt_subsample - 1.0) >= 1e-8 and abs(opt_colsubsample - 1.0) >= 1e-8:
             param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
                           "colsample_bytree": [opt_colsubsample - 0.05, opt_colsubsample, opt_colsubsample + 0.05]}
-        elif opt_subsample != 1.0:
+        elif abs(opt_subsample - 1.0) >= 1e-8:
             param_grid = {"subsample": [opt_subsample - 0.05, opt_subsample, opt_subsample + 0.05],
-                          "colsample_bytree": [1.0]}
-        elif opt_colsubsample != 1.0:
-            param_grid = {"subsample": [1.0],
+                          "colsample_bytree": [0.95, 1.0]}
+        elif abs(opt_colsubsample - 1.0) >= 1e-8:
+            param_grid = {"subsample": [0.95, 1.0],
                           "colsample_bytree": [opt_colsubsample - 0.05, opt_colsubsample, opt_colsubsample + 0.05]}
         else:
-            param_grid = {"subsample": [1.0], "colsample_bytree": [1.0]}
+            param_grid = {"subsample": [0.95, 1.0], "colsample_bytree": [0.95, 1.0]}
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(subsample=best_params['subsample'], colsample_bytree=best_params['colsample_bytree'])
