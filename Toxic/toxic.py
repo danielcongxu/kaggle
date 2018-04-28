@@ -121,10 +121,6 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     logger = misc.init_logger(method)
     logger.info("Begin to train RandomForest...")
     if not skip:
-        # base line model
-        # Accuracy : 0.9395
-        # AUC Score (Train): 0.869138
-        # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -173,10 +169,6 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     logger = misc.init_logger(method)
     logger.info("Begin to train GBDT...")
     if not skip:
-        # base line model
-        # Accuracy : 0.9409
-        # AUC Score (Train): 0.866622
-        # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -248,9 +240,6 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     logger = misc.init_logger(method)
     logger.info("Begin to train XGBoost...")
     if not skip:
-        # base line model
-        # Accuracy : 0.9444
-        # AUC Score (Train): 0.877955
         auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
         estimator.set_params(n_estimators=best_n_estimators)
 
@@ -341,10 +330,6 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     logger = misc.init_logger(method)
     logger.info("Begin to train ExtraTrees...")
     if not skip:
-        # base line model
-        # Accuracy : 0.9395
-        # AUC Score (Train): 0.869138
-        # CV Score : Mean - 0.8708569 | Std - 0.002699126 | Min - 0.868195 | Max - 0.8755527
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
