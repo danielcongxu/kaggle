@@ -31,7 +31,7 @@ test_set = pd.read_csv("dataset/test.csv")
 
 clf_svm = svm.SVC(
          kernel='linear',
-         tol=1e-4,
+         tol=1e-3,
          class_weight='balanced',
          verbose=True)
 
