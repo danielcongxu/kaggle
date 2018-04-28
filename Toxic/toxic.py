@@ -215,9 +215,12 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                  (0.03,  best_n_estimators * 10 / 3),
                  (0.01,  best_n_estimators * 10),
                  (0.005, best_n_estimators * 20)]
+        max_n_estimators  = 2400
         opt_params = None
         opt_score = 0.0
         for learning_rate, n_estimators in pairs:
+            if n_estimators > max_n_estimators:
+                break
             estimator.set_params(learning_rate=learning_rate, n_estimators=n_estimators)
             auc_score, acc_score = misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
             logger.info("With learning_rate %s, n_estimators %s, auc_score is %s, acc_score is %s" % (
