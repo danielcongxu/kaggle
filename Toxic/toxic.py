@@ -162,7 +162,6 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
-        # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -229,7 +228,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         for learning_rate, n_estimators in pairs:
             estimator.set_params(learning_rate=learning_rate, n_estimators=n_estimators)
             auc_score, acc_score = misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
-            logger.info("learning_rate is %s, n_estimators is %s. With these values, auc_score is %s, acc_score is %s" % (
+            logger.info("With learning_rate %s, n_estimators %s, auc_score is %s, acc_score is %s" % (
             learning_rate, n_estimators, auc_score, acc_score))
             if auc_score > opt_score:
                 opt_params = (learning_rate, n_estimators)
@@ -238,7 +237,6 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
 
-        # With optimization, the optimal auc is 0.8751157067, the optimal accuracy is 0.945090275
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -323,7 +321,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         for learning_rate in learning_rates:
             estimator.set_params(learning_rate=learning_rate, n_estimators=5000)
             auc_score, acc_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
-            logger.info("learning_rate is %s, n_estimators is %s. With these values, auc_score is %s, acc_score is %s" % (
+            logger.info("With learning_rate %s, n_estimators %s, auc_score is %s, acc_score is %s" % (
                 learning_rate, best_iter, auc_score, acc_score))
             if auc_score > opt_score:
                 opt_params = (learning_rate, best_iter)
@@ -384,7 +382,6 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
 
-        # With optimization, the optimal auc is 0.8752115902, the optimal accuracy is 0.9393624092
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
