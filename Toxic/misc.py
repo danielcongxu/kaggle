@@ -191,7 +191,7 @@ def modelfit(estimator, train_set, target_set, method, cv_folds=5, n_jobs=4):
     estimator.fit(train_set, target_set)
 
     # Perform cross-validation
-    logger.info("\nThe current parameters are\n %s" % str(estimator.get_params()))
+    logger.info("\nThe current parameters of %s are\n %s" % (method, str(estimator.get_params())))
     score_auc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
     score_acc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
     logger.info("Average roc_auc score : %.10f, average accuracy score: %.10f" % (score_auc, score_acc))
@@ -210,7 +210,7 @@ def modelfit_xgboost(estimator, train_set, target_set, method, cv_folds=5, early
     logger.info("Best iteration: %s" % str(best_iter))
     estimator.set_params(n_estimators=best_iter)
 
-    logger.info("\nThe current parameters are\n %s" % str(estimator.get_params()))
+    logger.info("\nThe current parameters of %s are\n %s" % (method, str(estimator.get_params())))
     estimator.fit(train_set, target_set, eval_metric='auc')
     score_auc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
     score_acc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
@@ -222,7 +222,7 @@ def run_gridsearch(X, y, estimator, param_grid, **params):
     logger = init_logger(params['method'])
     try:
         logger.info("begin to perform GridSearch on %s..." % str(param_grid))
-        logger.info("\nThe current parameters are\n %s" % str(estimator.get_params()))
+        logger.info("\nThe current parameters of %s are\n %s" % (params['method'], str(estimator.get_params())))
         gs = GridSearchCV(estimator=estimator, param_grid=param_grid, cv=params['cv'], scoring=params['scoring'], n_jobs=params['n_jobs'], verbose=1)
         sample_weight = compute_sample_weight(class_weight='balanced', y=y) if params['sample_weight'] is True else None
         gs.fit(X, y, sample_weight=sample_weight)
