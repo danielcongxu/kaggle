@@ -277,6 +277,10 @@ def update_params_toXML(estimator, method, xmlPath):
             sub.text = str(value)
             sub.tail = '\n'
         tree = ET.ElementTree(top)
+
+        param_dir = os.path.dirname(xmlPath)
+        if not os.path.exists(param_dir):
+            os.mkdir(param_dir)
     else:
         # The xml already exists
         tree = ET.parse(xmlPath)

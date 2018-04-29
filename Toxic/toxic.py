@@ -31,7 +31,6 @@ test_set = pd.read_csv("dataset/test.csv")
 
 clf_svm = svm.SVC(
          kernel='linear',
-         C=100,
          class_weight='balanced',
          verbose=2)
 
@@ -102,8 +101,9 @@ xgb_stack = xgb.XGBClassifier(
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # SVM
     logger = misc.init_logger(method)
-    logger.info("Begin to train SVM...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
     if not skip:
+        logger.info("Begin to train SVM...")
         # scale data for speeding up
         scaling = MinMaxScaler(feature_range=(-1, 1)).fit(trainX)
         transformed_trainX = scaling.transform(trainX)
@@ -112,10 +112,10 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                                                       sample_weight=False,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(C=best_params['C'])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -125,8 +125,9 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # RandomForest
     logger = misc.init_logger(method)
-    logger.info("Begin to train RandomForest...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
     if not skip:
+        logger.info("Begin to train RandomForest...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -163,13 +164,13 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -179,8 +180,9 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # GBDT
     logger = misc.init_logger(method)
-    logger.info("Begin to train GBDT...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
     if not skip:
+        logger.info("Begin to train GBDT...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -243,13 +245,13 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
         opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -259,8 +261,9 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Xgboost
     logger = misc.init_logger(method)
-    logger.info("Begin to train XGBoost...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
     if not skip:
+        logger.info("Begin to train XGBoost...")
         auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
         estimator.set_params(n_estimators=best_n_estimators)
 
@@ -339,13 +342,13 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
                     opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -355,8 +358,9 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Extremely Randomized Trees
     logger = misc.init_logger(method)
-    logger.info("Begin to train ExtraTrees...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
     if not skip:
+        logger.info("Begin to train ExtraTrees...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -393,13 +397,13 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -418,7 +422,7 @@ def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_job
                 ('xgboost', clf_xgb),
                 ('extraTree', clf_ext)
             ],
-            weights=[2, 2, 3, 1],
+            weights=[3, 2, 3, 1],
             voting='soft',
         )
 
