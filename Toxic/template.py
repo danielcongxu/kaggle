@@ -28,7 +28,7 @@ test_set = pd.read_csv("dataset/test.csv")
 # print(train_set['toxic'].value_counts())
 
 # Selected model: RandomForest, GBDT, XGboost, ExtraTrees
-
+# linear SVM
 clf_svm = svm.SVC(
          kernel='linear',
          class_weight='balanced',
@@ -101,7 +101,7 @@ xgb_stack = xgb.XGBClassifier(
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # SVM
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
     if not skip:
         logger.info("Begin to train SVM...")
         # scale data for speeding up
@@ -125,7 +125,7 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # RandomForest
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
     if not skip:
         logger.info("Begin to train RandomForest...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -180,7 +180,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # GBDT
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
     if not skip:
         logger.info("Begin to train GBDT...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -261,7 +261,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Xgboost
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
     if not skip:
         logger.info("Begin to train XGBoost...")
         auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -358,7 +358,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Extremely Randomized Trees
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
     if not skip:
         logger.info("Begin to train ExtraTrees...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
