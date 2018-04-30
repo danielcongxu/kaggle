@@ -169,16 +169,19 @@ def feature_engineering(original_data, vocab, type, is_test=False):
                             "%s_%s.csv" % (str(type), 'test' if is_test else 'train'))
     if not os.path.exists(csv_path):
         original_data['comment_text'] = original_data['comment_text'].str.strip()
-        modified_data = original_data.drop(score_cols, axis=1).join(pd.DataFrame(data=np.zeros((len(original_data), len(vocab[type]))),
-                                                  columns=vocab[type].keys(), dtype=np.int))
+        if is_test:
+            modified_data = original_data.join(pd.DataFrame(data=np.zeros((len(original_data), len(vocab[type]))),
+                                               columns=vocab[type].keys(), dtype=np.int))
+        else:
+            modified_data = original_data.drop(score_cols, axis=1).join(pd.DataFrame(data=np.zeros((len(original_data), len(vocab[type]))),
+                                               columns=vocab[type].keys(), dtype=np.int))
+            modified_data['score'] = original_data[type]
 
         for index, row in modified_data.iterrows():
             word_cnt = calc_toxic_word_index(row['comment_text'], vocab[type])
             for key, val in word_cnt.items():
                 modified_data.loc[index, key] = val
 
-        if not is_test:
-            modified_data['score'] = original_data[type]
         modified_data.to_csv(csv_path, index=False)
     else:
         modified_data = pd.read_csv(csv_path)
@@ -206,16 +209,15 @@ def modelfit_xgboost(estimator, train_set, target_set, method, cv_folds=5, early
     xgtrain = xgb.DMatrix(train_set, label=target_set)
     cvresult = xgb.cv(xgb_param, xgtrain, num_boost_round=estimator.get_params()['n_estimators'], nfold=cv_folds,
                         metrics='auc', early_stopping_rounds=early_stopping_rounds, verbose_eval=True)
-    best_iter = cvresult.shape[0]
-    logger.info("Best iteration: %s" % str(best_iter))
-    estimator.set_params(n_estimators=best_iter)
+    logger.info("Best iteration: %s" % str(cvresult.shape[0]))
+    estimator.set_params(n_estimators=cvresult.shape[0])
 
     logger.info("\nThe current parameters of %s are\n %s" % (method, str(estimator.get_params())))
     estimator.fit(train_set, target_set, eval_metric='auc')
     score_auc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='roc_auc', verbose=1, n_jobs=n_jobs).mean()
     score_acc = cross_val_score(estimator, train_set, target_set, cv=cv_folds, scoring='accuracy', verbose=1, n_jobs=n_jobs).mean()
     logger.info("Average roc_auc score : %.10f, average accuracy score: %.10f" % (score_auc, score_acc))
-    return score_auc, score_acc, best_iter
+    return score_auc, score_acc
 
 
 def run_gridsearch(X, y, estimator, param_grid, **params):
