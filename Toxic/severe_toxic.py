@@ -30,49 +30,55 @@ test_set = pd.read_csv("dataset/test.csv")
 # Selected model: RandomForest, GBDT, XGboost, ExtraTrees
 # linear SVM
 clf_svm = svm.SVC(
-         kernel='linear',
-         class_weight='balanced',
-         verbose=2)
+    kernel='linear',
+    C=10,
+    tol=1e-4,
+    class_weight='balanced',
+    verbose=True)
 
 # Random Forest
 clf_rf = RandomForestClassifier(
-    n_estimators=600,
+    n_estimators=640,
     max_depth=29,
-    min_samples_split=0.025,
+    min_samples_split=0.005,
     min_samples_leaf=5,
-    max_features=11,
+    max_features='auto',
     class_weight='balanced',
     n_jobs=4,
 )
 
 # GBDT
 clf_gb = GradientBoostingClassifier(
-    learning_rate=0.04,
-    n_estimators=875,
+    learning_rate=0.03,
+    n_estimators=600,
     max_depth=5,
-    min_samples_split=0.005,
-    min_samples_leaf=5,
-    max_features=23,
-    subsample=0.95
+    min_samples_split=0.025,
+    min_samples_leaf=45,
+    max_features=19,
+    subsample=0.9
 )
 
 # Xgboost
 clf_xgb = xgb.XGBClassifier(
-    learning_rate=0.1,
-    n_estimators=5000,
-    max_depth=5,
-    min_child_weight=1,
+    learning_rate=0.05,
+    n_estimators=120,
+    max_depth=19,
+    min_child_weight=5,
+    gamma=0.4,
+    subsample=1.0,
+    colsample_bytree=0.65,
+    reg_lambda=5.0,
     nthread=4,
     scale_pos_weight=1
 )
 
 # Extremely Randomized Trees
 clf_ext = ExtraTreesClassifier(
-    n_estimators=100,
-    max_depth=5,
-    min_samples_split=0.01,
+    n_estimators=400,
+    max_depth=23,
+    min_samples_split=0.02,
     min_samples_leaf=5,
-    max_features='auto',
+    max_features=49,
     class_weight='balanced',
     n_jobs=4,
     bootstrap=True,
@@ -187,48 +193,47 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
-        # param_grid = {"n_estimators": np.arange(50, 601, 50)}
-        # best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-        #                                               scoring='roc_auc', n_jobs=n_jobs, method=method)
-        # best_n_estimators = best_params['n_estimators']
-        # estimator.set_params(n_estimators=best_n_estimators)
-        #
-        # # fine tune max_depth and min_samples_split
-        # param_grid = {"max_depth": np.arange(5, 30, 2),
-        #               "min_samples_split": np.arange(0.005, 0.031, 0.005)}
-        # best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-        #                                               scoring='roc_auc', n_jobs=n_jobs, method=method)
-        # estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
-        #
-        # # fine tune min_samples_split and min_samples_leaf
-        # param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
-        # best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-        #                                               scoring='roc_auc', n_jobs=n_jobs, method=method)
-        # estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
-        #
-        # # fine tune max_features
-        # feat_num = len(list(trainX.columns))
-        # param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
-        # best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-        #                                               scoring='roc_auc', n_jobs=n_jobs, method=method)
-        # if best_params['max_features'] == int(np.sqrt(feat_num)):
-        #     estimator.set_params(max_features='auto')
-        # else:
-        #     estimator.set_params(max_features=best_params['max_features'])
-        #
-        # # fine tune subsample
-        # param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]}
-        # best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
-        #                                               scoring='roc_auc', n_jobs=n_jobs, method=method)
-        # estimator.set_params(subsample=best_params['subsample'])
+        param_grid = {"n_estimators": np.arange(50, 601, 50)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
+        best_n_estimators = best_params['n_estimators']
+        estimator.set_params(n_estimators=best_n_estimators)
+
+        # fine tune max_depth and min_samples_split
+        param_grid = {"max_depth": np.arange(5, 30, 2),
+                      "min_samples_split": np.arange(0.005, 0.031, 0.005)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
+        estimator.set_params(max_depth=best_params['max_depth'], min_samples_split=best_params['min_samples_split'])
+
+        # fine tune min_samples_split and min_samples_leaf
+        param_grid = {"min_samples_leaf": np.arange(5, 51, 5)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
+        estimator.set_params(min_samples_leaf=best_params['min_samples_leaf'])
+
+        # fine tune max_features
+        feat_num = len(list(trainX.columns))
+        param_grid = {"max_features": np.arange(int(np.sqrt(feat_num)), int(0.4 * feat_num), 2)}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
+        if best_params['max_features'] == int(np.sqrt(feat_num)):
+            estimator.set_params(max_features='auto')
+        else:
+            estimator.set_params(max_features=best_params['max_features'])
+
+        # fine tune subsample
+        param_grid = {"subsample": [0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]}
+        best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=True, cv=5,
+                                                      scoring='roc_auc', n_jobs=n_jobs, method=method)
+        estimator.set_params(subsample=best_params['subsample'])
 
         # refine-tune n_estimatosr
-        best_n_estimators = estimator.get_params()['n_estimators']
         pairs = [(0.1,   best_n_estimators),
-                 (0.075, int(best_n_estimators * 4.0 / 3)),
+                 (0.075, int(best_n_estimators * 4 / 3)),
                  (0.05,  best_n_estimators * 2),
-                 (0.04,  int(best_n_estimators * 5.0 / 2)),
-                 (0.03,  int(best_n_estimators * 10.0 / 3)),
+                 (0.04,  int(best_n_estimators * 2.5)),
+                 (0.03,  best_n_estimators * 10 / 3),
                  (0.01,  best_n_estimators * 10),
                  (0.005, best_n_estimators * 20)]
         max_n_estimators  = 2400
@@ -412,61 +417,61 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     return estimator
 
 
-def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip_cv=False):
+def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip=False):
     # Ensemble
     logger = misc.init_logger(method)
     logger.info("Begin to Ensemble...")
-    clf_vote_soft = VotingClassifier(
-        estimators=[
-            ('rf', clf_rf),
-            ('gbdt', clf_gb),
-            ('xgboost', clf_xgb),
-            ('extraTree', clf_ext)
-        ],
-        weights=[2, 1, 2, 1],
-        voting='soft'
-    )
+    if not skip:
+        clf_vote_soft = VotingClassifier(
+            estimators=[
+                ('rf', clf_rf),
+                ('gbdt', clf_gb),
+                ('xgboost', clf_xgb),
+                ('extraTree', clf_ext)
+            ],
+            weights=[2, 1, 2, 1],
+            voting='soft'
+        )
 
-    # sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-    #                           meta_classifier=lr_stack,
-    #                           verbose=1)
-    #
-    # sclf_prob = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-    #                                use_probas=True,
-    #                                average_probas=False,
-    #                                meta_classifier=lr_stack,
-    #                                verbose=1)
-    #
-    # sclf_xgb = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-    #                               meta_classifier=xgb_stack,
-    #                               verbose=1)
+        # sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+        #                           meta_classifier=lr_stack,
+        #                           verbose=1)
+        #
+        # sclf_prob = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+        #                                use_probas=True,
+        #                                average_probas=False,
+        #                                meta_classifier=lr_stack,
+        #                                verbose=1)
+        #
+        # sclf_xgb = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+        #                               meta_classifier=xgb_stack,
+        #                               verbose=1)
 
-    # logger.info("Begin to compare CV scores between different classifiers when ensembling...")
-    # for clf, label in zip([clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft],
-    #                       ['Random Forest',
-    #                        'GBDT',
-    #                        'XGBoost',
-    #                        'ExtraTrees',
-    #                        'SoftVotingClassifier']):
-    #     estimator, auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
-    #     if label == 'SoftVotingClassifier':
-    #         classifier = clf_vote_soft
-    #     logger.info(
-    #         'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
-    #             label, auc_score, acc_score))
+        # logger.info("Begin to compare CV scores between different classifiers when ensembling...")
+        # for clf, label in zip([clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft],
+        #                       ['Random Forest',
+        #                        'GBDT',
+        #                        'XGBoost',
+        #                        'ExtraTrees',
+        #                        'SoftVotingClassifier']):
+        #     estimator, auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
+        #     if label == 'SoftVotingClassifier':
+        #         classifier = clf_vote_soft
+        #     logger.info(
+        #         'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+        #             label, auc_score, acc_score))
 
+        try:
+            auc_score, acc_score = misc.modelfit(clf_vote_soft, trainX, trainY, method, n_jobs=n_jobs)
+        except Exception as errinfo:
+            raise
+        logger.info(
+                 'Using SoftVotingClassifier as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+                     auc_score, acc_score))
 
-    clf_vote_soft.fit(trainX, trainY)
-    if not skip_cv:
-        score_auc = cross_val_score(clf_vote_soft, trainX, trainY, cv=cv_folds, scoring='roc_auc', verbose=1,
-                                    n_jobs=n_jobs).mean()
-        score_acc = cross_val_score(clf_vote_soft, trainX, trainY, cv=cv_folds, scoring='accuracy', verbose=1,
-                                    n_jobs=n_jobs).mean()
-        logger.info('Using SoftVotingClassifier as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
-            score_auc, score_acc))
-
-    joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
-    return clf_vote_soft
+        joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
+        return clf_vote_soft
+    return None
 
 
 def train(train_set, comment_type, vocab, **skip_clf):
@@ -488,14 +493,14 @@ def train(train_set, comment_type, vocab, **skip_clf):
     skip_GBDT = True if ('skip_GBDT' in skip_clf and skip_clf['skip_GBDT'] is True) else False
     skip_XGB = True if ('skip_XGB' in skip_clf and skip_clf['skip_XGB'] is True) else False
     skip_ExtTree = True if ('skip_ExtTree' in skip_clf and skip_clf['skip_ExtTree'] is True) else False
-    skip_CV = True if ('skip_CV' in skip_clf and skip_clf['skip_CV'] is True) else False
+    skip_Ensemble = True if ('skip_Ensemble' in skip_clf and skip_clf['skip_Ensemble'] is True) else False
 
     clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type, skip=skip_RF)
     clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type, skip=skip_GBDT)
     clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type, skip=skip_XGB)
     clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type, skip=skip_ExtTree)
 
-    clf_vote_soft = run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type, skip_cv=skip_CV)
+    clf_vote_soft = run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type, skip=skip_Ensemble)
     return clf_vote_soft
 
 
@@ -508,7 +513,7 @@ def predict(test_set, comment_type, vocab, estimator, use_proba=False):
         result = estimator.predict_proba(df_test)
     else:
         result = estimator.predict(df_test)
-    return result[:, 1]
+    return result
 
 
 if __name__ == "__main__":
@@ -517,5 +522,9 @@ if __name__ == "__main__":
     # Generate vocabulary
     vocab = misc.sumForToxicType(train_set)
 
-    clf = train(train_set, comment_type, vocab, skip_RF=True, skip_GBDT=True)
-    result = predict(test_set, comment_type, vocab, clf, use_proba=True)
+    clf = train(train_set, comment_type, vocab, skip_RF=True, skip_GBDT=True, skip_XGB=True, skip_ExtTree=True)
+    if clf:
+        result = predict(test_set, comment_type, vocab, clf, use_proba=True)
+    else:
+        print("Fail to get the classifier for prediction...\n")
+    pass

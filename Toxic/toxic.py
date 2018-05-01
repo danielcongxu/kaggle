@@ -29,15 +29,17 @@ test_set = pd.read_csv("dataset/test.csv")
 
 # Selected model: SVM, RandomForest, GBDT, XGboost, ExtraTrees
 
-clf_svm = svm.SVC(
-         kernel='linear',
+clf_svm = svm.LinearSVC(
+         C=10,
+         tol=1e-3,
          class_weight='balanced',
+         max_iter=100000,
          verbose=2)
 
 # Random Forest
 clf_rf = RandomForestClassifier(
-    n_estimators=100,
-    max_depth=5,
+    n_estimators=280,
+    max_depth=27,
     min_samples_split=0.01,
     min_samples_leaf=5,
     max_features='auto',
@@ -47,31 +49,36 @@ clf_rf = RandomForestClassifier(
 
 # GBDT
 clf_gb = GradientBoostingClassifier(
-    learning_rate=0.1,
-    n_estimators=100,
+    learning_rate=0.03,
+    n_estimators=1200,
     max_depth=5,
-    min_samples_split=0.01,
+    min_samples_split=0.025,
     min_samples_leaf=5,
-    max_features='auto'
+    max_features=26,
+    subsample=0.75
 )
 
 # Xgboost
 clf_xgb = xgb.XGBClassifier(
-    learning_rate=0.1,
-    n_estimators=5000,
-    max_depth=5,
+    learning_rate=0.075,
+    n_estimators=144,
+    max_depth=21,
+    gamma=0.2,
+    subsample=0.55,
+    colsample_bytree=0.75,
     min_child_weight=1,
+    reg_lambda=10,
     nthread=4,
     scale_pos_weight=1
 )
 
 # Extremely Randomized Trees
 clf_ext = ExtraTreesClassifier(
-    n_estimators=100,
-    max_depth=5,
-    min_samples_split=0.01,
+    n_estimators=640,
+    max_depth=25,
+    min_samples_split=0.02,
     min_samples_leaf=5,
-    max_features='auto',
+    max_features=28,
     class_weight='balanced',
     n_jobs=4,
     bootstrap=True,
@@ -101,9 +108,8 @@ xgb_stack = xgb.XGBClassifier(
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # SVM
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    logger.info("Begin to train SVM...")
     if not skip:
-        logger.info("Begin to train SVM...")
         # scale data for speeding up
         scaling = MinMaxScaler(feature_range=(-1, 1)).fit(trainX)
         transformed_trainX = scaling.transform(trainX)
@@ -112,10 +118,10 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
                                                       sample_weight=False,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(C=best_params['C'])
-        misc.update_params_toXML(estimator, method, xmlPath)
+        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
+            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -125,9 +131,8 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # RandomForest
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    logger.info("Begin to train RandomForest...")
     if not skip:
-        logger.info("Begin to train RandomForest...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -164,13 +169,13 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
-        misc.update_params_toXML(estimator, method, xmlPath)
+        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
+            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -180,9 +185,8 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # GBDT
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    logger.info("Begin to train GBDT...")
     if not skip:
-        logger.info("Begin to train GBDT...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -245,13 +249,13 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
         opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
-        misc.update_params_toXML(estimator, method, xmlPath)
+        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
+            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -261,9 +265,8 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Xgboost
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    logger.info("Begin to train XGBoost...")
     if not skip:
-        logger.info("Begin to train XGBoost...")
         auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
         estimator.set_params(n_estimators=best_n_estimators)
 
@@ -342,13 +345,13 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
                     opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
-        misc.update_params_toXML(estimator, method, xmlPath)
+        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
+            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -358,9 +361,8 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Extremely Randomized Trees
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method)
+    logger.info("Begin to train ExtraTrees...")
     if not skip:
-        logger.info("Begin to train ExtraTrees...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -397,13 +399,13 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
-        misc.update_params_toXML(estimator, method, xmlPath)
+        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
+            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -422,8 +424,8 @@ def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_job
                 ('xgboost', clf_xgb),
                 ('extraTree', clf_ext)
             ],
-            weights=[3, 2, 3, 1],
-            voting='soft',
+            weights=[2, 1, 2, 1],
+            voting='soft'
         )
 
         sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
@@ -479,9 +481,9 @@ if __name__ == "__main__":
     # testY = np.ravel(val_set.loc[:, ['score']])
 
     # clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type)
-    clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type)
-    clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type)
-    clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type)
-    clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type)
+    clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type, skip=True)
+    clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type, skip=True)
+    clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type, skip=True)
+    clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type, skip=True)
 
     run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type)
