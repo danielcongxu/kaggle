@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import misc
+from sklearn.model_selection import cross_val_score
 from sklearn.externals import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
@@ -59,20 +60,24 @@ clf_gb = GradientBoostingClassifier(
 # Xgboost
 clf_xgb = xgb.XGBClassifier(
     learning_rate=0.1,
-    n_estimators=5000,
-    max_depth=5,
-    min_child_weight=1,
+    n_estimators=102,
+    max_depth=28,
+    min_child_weight=3,
+    gamma=0.4,
+    subsample=0.8,
+    colsample_bytree=0.6,
+    reg_lambda=1.0,
     nthread=4,
     scale_pos_weight=1
 )
 
 # Extremely Randomized Trees
 clf_ext = ExtraTreesClassifier(
-    n_estimators=100,
-    max_depth=5,
-    min_samples_split=0.01,
+    n_estimators=440,
+    max_depth=27,
+    min_samples_split=0.02,
     min_samples_leaf=5,
-    max_features='auto',
+    max_features=33,
     class_weight='balanced',
     n_jobs=4,
     bootstrap=True,
@@ -458,9 +463,9 @@ def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_job
 
     clf_vote_soft.fit(trainX, trainY)
     if not skip_cv:
-        score_auc = cross_val_score(clf_vote_soft, trainX, trainY, cv=cv_folds, scoring='roc_auc', verbose=1,
+        score_auc = cross_val_score(clf_vote_soft, trainX, trainY, cv=5, scoring='roc_auc', verbose=1,
                                     n_jobs=n_jobs).mean()
-        score_acc = cross_val_score(clf_vote_soft, trainX, trainY, cv=cv_folds, scoring='accuracy', verbose=1,
+        score_acc = cross_val_score(clf_vote_soft, trainX, trainY, cv=5, scoring='accuracy', verbose=1,
                                     n_jobs=n_jobs).mean()
         logger.info('Using SoftVotingClassifier as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
             score_auc, score_acc))

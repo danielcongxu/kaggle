@@ -5,6 +5,7 @@ import obscene
 import threat
 import insult
 import identity_hate
+import misc
 
 
 train_set = pd.read_csv("dataset/train.csv")

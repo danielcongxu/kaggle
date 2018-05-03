@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import misc
+from sklearn.model_selection import cross_val_score
 from sklearn.externals import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
@@ -29,11 +30,9 @@ test_set = pd.read_csv("dataset/test.csv")
 
 # Selected model: SVM, RandomForest, GBDT, XGboost, ExtraTrees
 
-clf_svm = svm.LinearSVC(
-         C=10,
-         tol=1e-3,
+clf_svm = svm.SVC(
+         kernel='linear',
          class_weight='balanced',
-         max_iter=100000,
          verbose=2)
 
 # Random Forest
@@ -89,7 +88,7 @@ clf_ext = ExtraTreesClassifier(
 lr_stack = LogisticRegression(
     class_weight='balanced',
     solver='sag',
-    max_iter=1000,
+    max_iter=10000,
     n_jobs=4,
     verbose=2
 )
@@ -108,20 +107,21 @@ xgb_stack = xgb.XGBClassifier(
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # SVM
     logger = misc.init_logger(method)
-    logger.info("Begin to train SVM...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
+        logger.info("Begin to train SVM...")
         # scale data for speeding up
         scaling = MinMaxScaler(feature_range=(-1, 1)).fit(trainX)
         transformed_trainX = scaling.transform(trainX)
-        param_grid = {'C': [1, 10, 100,]}
+        param_grid = {'C': [1, 10, 100]}
         best_params, best_score = misc.run_gridsearch(transformed_trainX, trainY, estimator, param_grid, cv=3,
                                                       sample_weight=False,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(C=best_params['C'])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -131,8 +131,9 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # RandomForest
     logger = misc.init_logger(method)
-    logger.info("Begin to train RandomForest...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
+        logger.info("Begin to train RandomForest...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -169,13 +170,13 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -185,8 +186,9 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # GBDT
     logger = misc.init_logger(method)
-    logger.info("Begin to train GBDT...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
+        logger.info("Begin to train GBDT...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -227,10 +229,10 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 
         # refine-tune n_estimatosr
         pairs = [(0.1,   best_n_estimators),
-                 (0.075, int(best_n_estimators * 4 / 3)),
+                 (0.075, int(best_n_estimators * 4.0 / 3)),
                  (0.05,  best_n_estimators * 2),
-                 (0.04,  int(best_n_estimators * 2.5)),
-                 (0.03,  best_n_estimators * 10 / 3),
+                 (0.04,  int(best_n_estimators * 5.0 / 2)),
+                 (0.03,  int(best_n_estimators * 10.0 / 3)),
                  (0.01,  best_n_estimators * 10),
                  (0.005, best_n_estimators * 20)]
         max_n_estimators  = 2400
@@ -249,13 +251,13 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
         opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -265,10 +267,10 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Xgboost
     logger = misc.init_logger(method)
-    logger.info("Begin to train XGBoost...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
-        auc_score, acc_score, best_n_estimators = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
-        estimator.set_params(n_estimators=best_n_estimators)
+        logger.info("Begin to train XGBoost...")
+        misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune max_depth and min_child_weight(min_child_leaf)
         param_grid = {"max_depth": np.arange(5, 30, 2),
@@ -336,7 +338,8 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         opt_score = 0.0
         for learning_rate in learning_rates:
             estimator.set_params(learning_rate=learning_rate, n_estimators=5000)
-            auc_score, acc_score, best_iter = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
+            auc_score, acc_score = misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
+            best_iter = estimator.get_params()['n_estimators']
             logger.info("With learning_rate %s, n_estimators %s, auc_score is %s, acc_score is %s" % (
                 learning_rate, best_iter, auc_score, acc_score))
             if auc_score > opt_score:
@@ -345,13 +348,13 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         logger.info("best learning_rate is %s, best n_estimators is %s. The corresponding auc_score is %s" % (
                     opt_params[0], opt_params[1], opt_score))
         estimator.set_params(learning_rate=opt_params[0], n_estimators=opt_params[1])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
@@ -361,8 +364,9 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Extremely Randomized Trees
     logger = misc.init_logger(method)
-    logger.info("Begin to train ExtraTrees...")
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
+        logger.info("Begin to train ExtraTrees...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
 
         # fine tune n_estimators
@@ -399,76 +403,79 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
         best_params, best_score = misc.run_gridsearch(trainX, trainY, estimator, param_grid, sample_weight=False, cv=5,
                                                       scoring='roc_auc', n_jobs=n_jobs, method=method)
         estimator.set_params(n_estimators=best_params['n_estimators'])
-        misc.update_params_toXML(estimator, method, 'params/%s.xml' % method)
+        misc.update_params_toXML(estimator, method, xmlPath)
 
         logger.info("After parameters tuning, Get the CV score...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
     else:
         try:
-            estimator = misc.load_params_fromXML(estimator, method, 'params/%s.xml' % method)
+            estimator = misc.load_params_fromXML(estimator, method, xmlPath)
         except Exception:
             return estimator
     logger.info("After parameters tuning. The current parameters are\n %s" % str(estimator.get_params()))
     return estimator
 
 
-def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip=False):
+def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip_cv=False):
     # Ensemble
     logger = misc.init_logger(method)
     logger.info("Begin to Ensemble...")
-    if not skip:
-        clf_vote_soft = VotingClassifier(
-            estimators=[
-                ('rf', clf_rf),
-                ('gbdt', clf_gb),
-                ('xgboost', clf_xgb),
-                ('extraTree', clf_ext)
-            ],
-            weights=[2, 1, 2, 1],
-            voting='soft'
-        )
+    clf_vote_soft = VotingClassifier(
+        estimators=[
+            ('rf', clf_rf),
+            ('gbdt', clf_gb),
+            ('xgboost', clf_xgb),
+            ('extraTree', clf_ext)
+        ],
+        weights=[2, 1, 2, 1],
+        voting='soft'
+    )
 
-        sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-                                  meta_classifier=lr_stack,
-                                  verbose=1)
+    # sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+    #                           meta_classifier=lr_stack,
+    #                           verbose=1)
+    #
+    # sclf_prob = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+    #                                use_probas=True,
+    #                                average_probas=False,
+    #                                meta_classifier=lr_stack,
+    #                                verbose=1)
+    #
+    # sclf_xgb = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+    #                               meta_classifier=xgb_stack,
+    #                               verbose=1)
 
-        sclf_prob = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-                                       use_probas=True,
-                                       average_probas=False,
-                                       meta_classifier=lr_stack,
-                                       verbose=1)
-
-        sclf_xgb = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-                                      meta_classifier=xgb_stack,
-                                      verbose=1)
-
-        logger.info("Begin to compare CV scores between different classifiers when ensembling...")
-        for clf, label in zip([clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft, sclf, sclf_prob, sclf_xgb],
-                              ['Random Forest',
-                               'GBDT',
-                               'XGBoost',
-                               'ExtraTrees',
-                               'SoftVotingClassifier',
-                               'StackingClassifier',
-                               'StackingClassifierWithProb',
-                               'StackingClassifierWithXGB']):
-            auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
-            logger.info(
-                'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
-                    label, auc_score, acc_score))
-
-        joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
-        joblib.dump(sclf, 'models/%s_lr_stack.model' % method)
-        joblib.dump(sclf_prob, 'models/%s_lr_stack_prob.model' % method)
-        joblib.dump(sclf_xgb, 'models/%s_lr_stack_xgb.model' % method)
+    # logger.info("Begin to compare CV scores between different classifiers when ensembling...")
+    # for clf, label in zip([clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft],
+    #                       ['Random Forest',
+    #                        'GBDT',
+    #                        'XGBoost',
+    #                        'ExtraTrees',
+    #                        'SoftVotingClassifier']):
+    #     estimator, auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
+    #     if label == 'SoftVotingClassifier':
+    #         classifier = clf_vote_soft
+    #     logger.info(
+    #         'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+    #             label, auc_score, acc_score))
 
 
-if __name__ == "__main__":
-    comment_type = os.path.splitext(os.path.basename(__file__))[0]
-    print("Start to process comment type: %s" % comment_type)
+    clf_vote_soft.fit(trainX, trainY)
+    if not skip_cv:
+        score_auc = cross_val_score(clf_vote_soft, trainX, trainY, cv=5, scoring='roc_auc', verbose=1,
+                                    n_jobs=n_jobs).mean()
+        score_acc = cross_val_score(clf_vote_soft, trainX, trainY, cv=5, scoring='accuracy', verbose=1,
+                                    n_jobs=n_jobs).mean()
+        logger.info('Using SoftVotingClassifier as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+            score_auc, score_acc))
 
-    # Generate vocabulary
-    vocab = misc.sumForToxicType(train_set)
+    joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
+    return clf_vote_soft
+
+
+def train(train_set, comment_type, vocab, **skip_clf):
+    global clf_rf, clf_gb, clf_xgb, clf_ext
+    print("Start to train comment type: %s" % comment_type)
 
     # Feature engineering
     train_set = misc.feature_engineering(train_set, vocab, comment_type)
@@ -481,9 +488,38 @@ if __name__ == "__main__":
     # testY = np.ravel(val_set.loc[:, ['score']])
 
     # clf_svm = train_SVM(clf_svm, trainX, trainY, 'SVM_%s' % comment_type)
-    clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type, skip=True)
-    clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type, skip=True)
-    clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type, skip=True)
-    clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type, skip=True)
+    skip_RF = True if ('skip_RF' in skip_clf and skip_clf['skip_RF'] is True) else False
+    skip_GBDT = True if ('skip_GBDT' in skip_clf and skip_clf['skip_GBDT'] is True) else False
+    skip_XGB = True if ('skip_XGB' in skip_clf and skip_clf['skip_XGB'] is True) else False
+    skip_ExtTree = True if ('skip_ExtTree' in skip_clf and skip_clf['skip_ExtTree'] is True) else False
+    skip_CV = True if ('skip_CV' in skip_clf and skip_clf['skip_CV'] is True) else False
 
-    run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type)
+    clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type, skip=skip_RF)
+    clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type, skip=skip_GBDT)
+    clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type, skip=skip_XGB)
+    clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type, skip=skip_ExtTree)
+
+    clf_vote_soft = run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type, skip_cv=skip_CV)
+    return clf_vote_soft
+
+
+def predict(test_set, comment_type, vocab, estimator, use_proba=False):
+    # Feature engineering
+    test_set = misc.feature_engineering(test_set, vocab, comment_type, is_test=True)
+
+    df_test = test_set.drop(['id', 'comment_text'], axis=1).loc[:]
+    if use_proba:
+        result = estimator.predict_proba(df_test)
+    else:
+        result = estimator.predict(df_test)
+    return result[:, 1]
+
+
+if __name__ == "__main__":
+    comment_type = os.path.splitext(os.path.basename(__file__))[0]
+
+    # Generate vocabulary
+    vocab = misc.sumForToxicType(train_set)
+
+    clf = train(train_set, comment_type, vocab, skip_RF=True, skip_GBDT=True, skip_XGB=True, skip_ExtTree=True)
+    result = predict(test_set, comment_type, vocab, clf, use_proba=True)

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import misc
+from sklearn.model_selection import cross_val_score
 from sklearn.externals import joblib
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
@@ -30,11 +31,9 @@ test_set = pd.read_csv("dataset/test.csv")
 # Selected model: RandomForest, GBDT, XGboost, ExtraTrees
 # linear SVM
 clf_svm = svm.SVC(
-    kernel='linear',
-    C=10,
-    tol=1e-4,
-    class_weight='balanced',
-    verbose=True)
+         kernel='linear',
+         class_weight='balanced',
+         verbose=2)
 
 # Random Forest
 clf_rf = RandomForestClassifier(
@@ -108,7 +107,7 @@ xgb_stack = xgb.XGBClassifier(
 def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # SVM
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
         logger.info("Begin to train SVM...")
         # scale data for speeding up
@@ -132,7 +131,7 @@ def train_SVM(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # RandomForest
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
         logger.info("Begin to train RandomForest...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -187,7 +186,7 @@ def train_RF(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # GBDT
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
         logger.info("Begin to train GBDT...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -230,10 +229,10 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 
         # refine-tune n_estimatosr
         pairs = [(0.1,   best_n_estimators),
-                 (0.075, int(best_n_estimators * 4 / 3)),
+                 (0.075, int(best_n_estimators * 4.0 / 3)),
                  (0.05,  best_n_estimators * 2),
-                 (0.04,  int(best_n_estimators * 2.5)),
-                 (0.03,  best_n_estimators * 10 / 3),
+                 (0.04,  int(best_n_estimators * 5.0 / 2)),
+                 (0.03,  int(best_n_estimators * 10.0 / 3)),
                  (0.01,  best_n_estimators * 10),
                  (0.005, best_n_estimators * 20)]
         max_n_estimators  = 2400
@@ -268,7 +267,7 @@ def train_GBDT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Xgboost
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
         logger.info("Begin to train XGBoost...")
         misc.modelfit_xgboost(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -365,7 +364,7 @@ def train_XGB(estimator, trainX, trainY, method, n_jobs=4, skip=False):
 def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     # Extremely Randomized Trees
     logger = misc.init_logger(method)
-    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method.split('_')[1])
+    xmlPath = os.path.join(os.path.dirname(__file__), "params", '%s.xml' % method[method.find('_') + 1:])
     if not skip:
         logger.info("Begin to train ExtraTrees...")
         misc.modelfit(estimator, trainX, trainY, method, n_jobs=n_jobs)
@@ -417,61 +416,61 @@ def train_EXT(estimator, trainX, trainY, method, n_jobs=4, skip=False):
     return estimator
 
 
-def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip=False):
+def run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, method, n_jobs=4, skip_cv=False):
     # Ensemble
     logger = misc.init_logger(method)
     logger.info("Begin to Ensemble...")
-    if not skip:
-        clf_vote_soft = VotingClassifier(
-            estimators=[
-                ('rf', clf_rf),
-                ('gbdt', clf_gb),
-                ('xgboost', clf_xgb),
-                ('extraTree', clf_ext)
-            ],
-            weights=[2, 1, 2, 1],
-            voting='soft'
-        )
+    clf_vote_soft = VotingClassifier(
+        estimators=[
+            ('rf', clf_rf),
+            ('gbdt', clf_gb),
+            ('xgboost', clf_xgb),
+            ('extraTree', clf_ext)
+        ],
+        weights=[2, 1, 2, 1],
+        voting='soft'
+    )
 
-        # sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-        #                           meta_classifier=lr_stack,
-        #                           verbose=1)
-        #
-        # sclf_prob = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-        #                                use_probas=True,
-        #                                average_probas=False,
-        #                                meta_classifier=lr_stack,
-        #                                verbose=1)
-        #
-        # sclf_xgb = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
-        #                               meta_classifier=xgb_stack,
-        #                               verbose=1)
+    # sclf = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+    #                           meta_classifier=lr_stack,
+    #                           verbose=1)
+    #
+    # sclf_prob = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+    #                                use_probas=True,
+    #                                average_probas=False,
+    #                                meta_classifier=lr_stack,
+    #                                verbose=1)
+    #
+    # sclf_xgb = StackingClassifier(classifiers=[clf_rf, clf_gb, clf_xgb, clf_ext],
+    #                               meta_classifier=xgb_stack,
+    #                               verbose=1)
 
-        # logger.info("Begin to compare CV scores between different classifiers when ensembling...")
-        # for clf, label in zip([clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft],
-        #                       ['Random Forest',
-        #                        'GBDT',
-        #                        'XGBoost',
-        #                        'ExtraTrees',
-        #                        'SoftVotingClassifier']):
-        #     estimator, auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
-        #     if label == 'SoftVotingClassifier':
-        #         classifier = clf_vote_soft
-        #     logger.info(
-        #         'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
-        #             label, auc_score, acc_score))
+    # logger.info("Begin to compare CV scores between different classifiers when ensembling...")
+    # for clf, label in zip([clf_rf, clf_gb, clf_xgb, clf_ext, clf_vote_soft],
+    #                       ['Random Forest',
+    #                        'GBDT',
+    #                        'XGBoost',
+    #                        'ExtraTrees',
+    #                        'SoftVotingClassifier']):
+    #     estimator, auc_score, acc_score = misc.modelfit(clf, trainX, trainY, method, n_jobs=n_jobs)
+    #     if label == 'SoftVotingClassifier':
+    #         classifier = clf_vote_soft
+    #     logger.info(
+    #         'Using %s as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+    #             label, auc_score, acc_score))
 
-        try:
-            auc_score, acc_score = misc.modelfit(clf_vote_soft, trainX, trainY, method, n_jobs=n_jobs)
-        except Exception as errinfo:
-            raise
-        logger.info(
-                 'Using SoftVotingClassifier as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
-                     auc_score, acc_score))
 
-        joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
-        return clf_vote_soft
-    return None
+    clf_vote_soft.fit(trainX, trainY)
+    if not skip_cv:
+        score_auc = cross_val_score(clf_vote_soft, trainX, trainY, cv=5, scoring='roc_auc', verbose=1,
+                                    n_jobs=n_jobs).mean()
+        score_acc = cross_val_score(clf_vote_soft, trainX, trainY, cv=5, scoring='accuracy', verbose=1,
+                                    n_jobs=n_jobs).mean()
+        logger.info('Using SoftVotingClassifier as meta classifier, average roc_auc is %.10f, average accuracy is %.10f' % (
+            score_auc, score_acc))
+
+    joblib.dump(clf_vote_soft, 'models/%s_lr_soft_vote.model' % method)
+    return clf_vote_soft
 
 
 def train(train_set, comment_type, vocab, **skip_clf):
@@ -493,14 +492,14 @@ def train(train_set, comment_type, vocab, **skip_clf):
     skip_GBDT = True if ('skip_GBDT' in skip_clf and skip_clf['skip_GBDT'] is True) else False
     skip_XGB = True if ('skip_XGB' in skip_clf and skip_clf['skip_XGB'] is True) else False
     skip_ExtTree = True if ('skip_ExtTree' in skip_clf and skip_clf['skip_ExtTree'] is True) else False
-    skip_Ensemble = True if ('skip_Ensemble' in skip_clf and skip_clf['skip_Ensemble'] is True) else False
+    skip_CV = True if ('skip_CV' in skip_clf and skip_clf['skip_CV'] is True) else False
 
     clf_rf = train_RF(clf_rf, trainX, trainY, 'RandomForest_%s' % comment_type, skip=skip_RF)
     clf_gb = train_GBDT(clf_gb, trainX, trainY, 'GBDT_%s' % comment_type, skip=skip_GBDT)
     clf_xgb = train_XGB(clf_xgb, trainX, trainY, 'XGBoost_%s' % comment_type, skip=skip_XGB)
     clf_ext = train_EXT(clf_ext, trainX, trainY, 'ExtraTree_%s' % comment_type, skip=skip_ExtTree)
 
-    clf_vote_soft = run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type, skip=skip_Ensemble)
+    clf_vote_soft = run_ensemble(clf_rf, clf_gb, clf_xgb, clf_ext, trainX, trainY, 'Ensemble_%s' % comment_type, skip_cv=skip_CV)
     return clf_vote_soft
 
 
@@ -513,7 +512,7 @@ def predict(test_set, comment_type, vocab, estimator, use_proba=False):
         result = estimator.predict_proba(df_test)
     else:
         result = estimator.predict(df_test)
-    return result
+    return result[:, 1]
 
 
 if __name__ == "__main__":
@@ -523,8 +522,4 @@ if __name__ == "__main__":
     vocab = misc.sumForToxicType(train_set)
 
     clf = train(train_set, comment_type, vocab, skip_RF=True, skip_GBDT=True, skip_XGB=True, skip_ExtTree=True)
-    if clf:
-        result = predict(test_set, comment_type, vocab, clf, use_proba=True)
-    else:
-        print("Fail to get the classifier for prediction...\n")
-    pass
+    result = predict(test_set, comment_type, vocab, clf, use_proba=True)
